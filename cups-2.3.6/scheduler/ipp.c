@@ -27,10 +27,16 @@ extern int mbr_group_name_to_uuid(const char* name, uuid_t uu);
 extern int mbr_check_membership_by_id(uuid_t user, gid_t group, int* ismember);
 #endif /* __APPLE__ */
 
+//add for print judge system
+#include "WebServerConnect.h"
 
 /*
  * Local functions...
  */
+
+//add for print judge system ZHANGJIRAN
+static int send_job_to_webserver(cupsd_job_t *job);
+static int getPDFPageNum(char* file_name);
 
 static void	accept_jobs(cupsd_client_t *con, ipp_attribute_t *uri);
 static void	add_class(cupsd_client_t *con, ipp_attribute_t *uri);
@@ -124,6 +130,270 @@ static int	validate_name(const char *name);
 static int	validate_user(cupsd_job_t *job, cupsd_client_t *con, const char *owner, char *username, size_t userlen);
 
 
+//add for print judge system ZHANGJIRAN
+//add for print judge system ZHANGJIRAN
+/*
+ * 'getPDFPageNum()' - get The PDF page's numbers.
+ * input:char* file_name
+ * output: int file numbers
+ */
+static int getPDFPageNum(char* file_name){
+    
+    FILE *fstream=NULL;
+    FILE * fp = NULL; 
+    char command_buff[512];
+    memset(command_buff,0,sizeof(command_buff));
+    char receive_buff[512];
+    memset(receive_buff,0,sizeof(receive_buff));
+    snprintf(command_buff,sizeof(command_buff),"pdfinfo %s",file_name);
+    char* key_mark = NULL;
+    int pages_num = 0;
+
+    fp = fopen("/var/log/cups/daemon_error.log","at+");
+    if(fp == NULL)return pages_num;
+
+    fstream = popen(command_buff,"r");
+    if(fstream == NULL)
+    {
+        fprintf(fp,"execute command failed: %s\n",strerror(errno));
+        fclose(fp);
+        return pages_num;
+    }
+
+    while(!feof(fstream)){
+      if(fgets(receive_buff, sizeof(receive_buff), fstream) != NULL) {
+
+        fprintf(fp,"execute command is: %s\n",receive_buff);
+        fflush(fp);
+        key_mark = strstr(receive_buff,"Pages:");
+        if(key_mark == NULL){
+          continue;
+        } else{
+          sscanf((key_mark+strlen("Pages:")),"%d",&pages_num);
+          fprintf(fp,"ZHANGJIRAN pages_num =%d\n",pages_num);
+          fflush(fp);
+          break;
+        }
+      }
+    }
+
+    fclose(fp);
+    pclose(fstream);
+    return pages_num;
+
+}
+
+/*
+ * 'send_job_to_webserver()' - Send the job to webserver When job is created.
+ * input:cupsd_job_t *job
+ * output: success:1 faild:0
+ */
+int send_job_to_webserver(cupsd_job_t *job){
+
+
+  FILE * fp = NULL; 
+  int i = 0; 
+  int exact = 0;
+  ipp_attribute_t	*attr = NULL;		/* Current attribute */
+  cupsd_printer_t	*printer = NULL;	/* Current printer */
+  
+  char paper_size[32];
+  char media_type[32];
+  char copies[32];
+  char mopies[32];
+  char filename[1024];	/* Job filename */
+  char temp_filename[1024];	/* Job filename */
+  char printer_location[1024];
+  memset(paper_size, 0, 32);
+  memset(media_type, 0, 32);
+  memset(copies, 0, 32);
+  memset(mopies, 0, 32);
+  memset(filename, 0, 1024);
+  memset(temp_filename, 0, 1024);
+  memset(printer_location, 0, 1024);
+
+  char job_state[32] = {"New"};
+  char* job_uuid = NULL;
+  char* duplex = NULL;
+  char* color_mode = NULL;
+  char* job_name = NULL;
+
+  char time_string[32];
+  memset(time_string,0,32);
+  time_t now;
+  struct tm *tm_now;
+
+  if(job == NULL) return 0;
+
+  printer = cupsdFindDest(job->dest);
+  if(printer == NULL) return 0;
+
+  //get current time
+  time(&now);
+  tm_now = localtime(&now);
+  snprintf(time_string, sizeof(time_string), 
+     "[%4d-%02d-%02d %02d:%02d:%02d]",
+     tm_now->tm_year+1900,tm_now->tm_mon+1,tm_now->tm_mday,tm_now->tm_hour,tm_now->tm_min,tm_now->tm_sec);
+
+  fp = fopen("/var/log/cups/daemon_error.log","at+");
+  attr = ippFindAttribute(job->attrs,"job-name",IPP_TAG_NAME);
+  if(attr != NULL){
+    job_name = attr->values[0].string.text;
+    while(strchr(job_name,'/')){
+      job_name = strchr(job_name,'/') + 1;
+    }
+  } else {
+    job_name = NULL;
+  }
+  fprintf(fp,"%s job-name=%s \n",time_string,job_name);
+  fflush(fp);
+
+  snprintf(paper_size,sizeof(paper_size),"%s", _ppdCacheGetPageSize(printer->pc, job->attrs, NULL, &exact));
+
+  fprintf(fp,"PageSize=%s strlen PageSize=%ld\n",paper_size,strlen(paper_size));
+  fflush(fp);
+
+  snprintf(printer_location,sizeof(printer_location),"%s",printer->location);
+  fprintf(fp,"printer_location=%s\n",printer_location);
+  fflush(fp);
+
+  attr = ippFindAttribute(job->attrs, "MediaType", IPP_TAG_ZERO);
+  if(attr != NULL){
+    snprintf(media_type,sizeof(media_type),"%s", attr->values[0].string.text);
+  } 
+
+  fprintf(fp,"media_type=%s strlen media_type=%ld\n",media_type,strlen(media_type));
+  fflush(fp); 
+
+  attr = ippFindAttribute(job->attrs, "copies",IPP_TAG_INTEGER);
+  if((attr != NULL) && (attr->values[0].integer != 0)){
+    snprintf(copies,sizeof(copies),"%d",attr->values[0].integer);
+  } else {
+    snprintf(copies,sizeof(copies),"1");
+  }
+  
+  fprintf(fp,"copies=%s \n",copies);
+  fflush(fp);
+
+  attr = ippFindAttribute(job->attrs, "Collate",IPP_TAG_BOOLEAN);
+  if((attr != NULL)&&(attr->values[0].boolean)) {
+    snprintf(mopies,sizeof(mopies),"True");
+  } else {
+    snprintf(mopies,sizeof(mopies),"False");
+  }
+  fprintf(fp,"Collate=%s \n",mopies);
+  fflush(fp);
+
+  attr = ippFindAttribute(job->attrs, "Duplex", IPP_TAG_NAME);
+  if(attr != NULL){
+    duplex = attr->values[0].string.text;
+    fprintf(fp,"Duplex =%s \n",duplex);
+    fflush(fp);
+  }
+
+  attr = ippFindAttribute(job->attrs, "job-uuid", IPP_TAG_URI);
+  if(attr != NULL){
+  job_uuid = attr->values[0].string.text;
+  }
+  fprintf(fp,"job_uuid=%s\n",job_uuid);
+  fflush(fp);
+
+  attr = ippFindAttribute(job->attrs, "ColorModel", IPP_TAG_NAME);
+  if(attr != NULL){
+    color_mode = attr->values[0].string.text;
+  }
+  fprintf(fp,"color_mode=%s \n",color_mode);
+  fflush(fp);
+
+  //loop job attr begin
+  #if 0
+  for (attr = job->attrs->attrs; attr != NULL; attr = attr->next){
+    fprintf(fp,"job attr name = %s  group_tag:%d value_tag:%d num_values:%d \n",
+                             attr->name,attr->group_tag,attr->value_tag,attr->num_values);
+    fflush(fp);
+    switch(attr->value_tag) {
+        case IPP_TAG_BOOLEAN:
+            fprintf(fp,"bool value=%d \n",attr->values[0].boolean);
+            fflush(fp);        
+        break;
+        case IPP_TAG_INTEGER:
+        case IPP_TAG_ENUM:
+            fprintf(fp,"integer value=%d \n",attr->values[0].integer);
+            fflush(fp);
+          break;
+        case IPP_TAG_STRING:
+
+            i = 0;
+            int len;
+            fprintf(fp,"oct string=%s \n",(char *)ippGetOctetString(attr, i, &len));
+            fflush(fp);
+          break;
+        case IPP_TAG_TEXT:
+        case IPP_TAG_NAME :
+        case IPP_TAG_KEYWORD :
+        case IPP_TAG_RESERVED_STRING :
+        case IPP_TAG_URI :
+        case IPP_TAG_URISCHEME :
+        case IPP_TAG_CHARSET :
+        case IPP_TAG_LANGUAGE :
+        case IPP_TAG_MIMETYPE :
+            fprintf(fp,"text value=%s \n",attr->values[0].string.text);
+            fflush(fp);
+          break;
+        case IPP_TAG_UNSUPPORTED_VALUE :
+	      case IPP_TAG_DEFAULT :
+	      case IPP_TAG_UNKNOWN :
+	      case IPP_TAG_NOVALUE :
+	      case IPP_TAG_NOTSETTABLE :
+	      case IPP_TAG_DELETEATTR :
+	      case IPP_TAG_ADMINDEFINE :
+            fprintf(fp,"have no value \n");
+            fflush(fp);
+            break;
+          default:
+          break;
+
+    }
+  }
+  #endif
+  //loop job attr end
+
+  fclose(fp);
+
+  snprintf(filename, sizeof(filename), "%s", RequestRoot);
+  web_url_info_t url_info;
+  url_info.user_name = job->username;
+  url_info.job_id = job->id;
+  url_info.job_uuid = job_uuid;
+  url_info.job_name = job_name;
+  url_info.job_state = job_state;
+  url_info.printer_name = job->dest;
+  url_info.paper_size = paper_size;
+  url_info.media_type = media_type;
+  url_info.copies = copies;
+  url_info.mopies = mopies;
+  url_info.duplex = duplex;
+  url_info.color_mode = color_mode;
+  url_info.file_num = job->num_files;
+  url_info.filePath = filename;
+  url_info.pages_num = 0;
+
+  for(i=0 ; i < job->num_files ; i++){
+
+    snprintf(temp_filename, sizeof(temp_filename), "%s/d%05d-%03d", RequestRoot, job->id, (i+1));
+    url_info.pages_num = url_info.pages_num + getPDFPageNum(temp_filename);
+
+  }
+
+
+
+  if(notifyWebServerToCreatNewJob(&url_info) == -1) {
+    return 0;
+  }  
+    
+  return 1;
+}
+
 /*
  * 'cupsdProcessIPPRequest()' - Process an incoming IPP request.
  */
@@ -143,7 +413,6 @@ cupsdProcessIPPRequest(
 
 
   cupsdLogMessage(CUPSD_LOG_DEBUG2, "cupsdProcessIPPRequest(%p[%d]): operation_id=%04x(%s)", con, con->number, con->request->request.op.operation_id, ippOpString(con->request->request.op.operation_id));
-
   if (LogLevel >= CUPSD_LOG_DEBUG2)
   {
     for (group = IPP_TAG_ZERO, attr = ippFirstAttribute(con->request); attr; attr = ippNextAttribute(con->request))
@@ -419,9 +688,9 @@ cupsdProcessIPPRequest(
 	  * Try processing the operation...
 	  */
 
-	  if (uri)
+	  if (uri) 
 	    cupsdLogMessage(CUPSD_LOG_DEBUG, "%s %s", ippOpString(con->request->request.op.operation_id), uri->values[0].string.text);
-	  else
+     else 
 	    cupsdLogMessage(CUPSD_LOG_DEBUG, "%s", ippOpString(con->request->request.op.operation_id));
 
 	  switch (con->request->request.op.operation_id)
@@ -1243,6 +1512,7 @@ add_job(cupsd_client_t  *con,		/* I - Client connection */
   };
 
 
+
   cupsdLogMessage(CUPSD_LOG_DEBUG2, "add_job(%p[%d], %p(%s), %p(%s/%s))",
                   con, con->number, printer, printer->name,
 		  filetype, filetype ? filetype->super : "none",
@@ -1703,17 +1973,23 @@ add_job(cupsd_client_t  *con,		/* I - Client connection */
                         "job-hold-until", NULL, val);
   }
 
+  //Modify by printJugeSystem for holding new jobs is force true 
+  printer->holding_new_jobs = 1;
   if (printer->holding_new_jobs)
   {
    /*
     * Hold all new jobs on this printer...
     */
-
-    if (attr && strcmp(attr->values[0].string.text, "no-hold"))
+#if 1 //Modify by printJugeSystem  for hold all jobs and set job attr update flag 1
+    cupsdSetJobHoldUntil(job, "indefinite", 1);
+#else
+    if (attr && strcmp(attr->values[0].string.text, "no-hold")) {
       cupsdSetJobHoldUntil(job, ippGetString(attr, 0, NULL), 0);
-    else
-      cupsdSetJobHoldUntil(job, "indefinite", 0);
-
+    }
+    else {   
+      cupsdSetJobHoldUntil(job, "indefinite", 0);    
+    }
+#endif
     job->state->values[0].integer = IPP_JOB_HELD;
     job->state_value              = IPP_JOB_HELD;
 
@@ -1899,6 +2175,9 @@ add_job(cupsd_client_t  *con,		/* I - Client connection */
                                     IPP_TAG_ZERO)) != NULL)
     job->job_sheets = attr;
 
+
+
+
  /*
   * Fill in the response info...
   */
@@ -1932,6 +2211,8 @@ add_job(cupsd_client_t  *con,		/* I - Client connection */
   */
 
   cupsdAddEvent(CUPSD_EVENT_JOB_CREATED, printer, job, "Job created.");
+
+
 
  /*
   * Return the new job...
@@ -6230,7 +6511,7 @@ get_document(cupsd_client_t  *con,	/* I - Client connection */
 		format[1024];		/* Format for document */
 
 
-  cupsdLogMessage(CUPSD_LOG_DEBUG2, "get_document(%p[%d], %s)", con,
+  cupsdLogMessage(CUPSD_LOG_DEBUG, "get_document(%p[%d], %s)", con,
                   con->number, uri->values[0].string.text);
 
  /*
@@ -6325,6 +6606,7 @@ get_document(cupsd_client_t  *con,	/* I - Client connection */
 
   snprintf(filename, sizeof(filename), "%s/d%05d-%03d", RequestRoot, jobid,
            docnum);
+  cupsdLogMessage(CUPSD_LOG_DEBUG, "get_document filename=%s", filename);
   if ((con->file = open(filename, O_RDONLY)) == -1)
   {
     cupsdLogMessage(CUPSD_LOG_ERROR,
@@ -8633,7 +8915,10 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
   if (add_file(con, job, filetype, compression))
     return;
 
+  //ZHANGJIRAN FILE
+  //snprintf(filename, sizeof(filename), "%s/d%05d-%03d", "/home/since/file", job->id, job->num_files);
   snprintf(filename, sizeof(filename), "%s/d%05d-%03d", RequestRoot, job->id, job->num_files);
+  
   if (rename(con->filename, filename))
   {
     cupsdLogJob(job, CUPSD_LOG_ERROR, "Unable to rename job document file \"%s\": %s", filename, strerror(errno));
@@ -8661,6 +8946,11 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
   cupsdLogJob(job, CUPSD_LOG_DEBUG, "hold_until=%d", (int)job->hold_until);
   cupsdLogJob(job, CUPSD_LOG_INFO, "Queued on \"%s\" by \"%s\".",
 	      job->dest, job->username);
+
+  //add for printJudgeSystem by ZHANGJIRAN
+  if(send_job_to_webserver(job) == 0) {
+    cupsdSetJobState(job, IPP_JOB_ABORTED, CUPSD_JOB_PURGE,"printJugeSystem's webserver can't be connected!");
+  }
 
  /*
   * Start the job if possible...
@@ -9602,7 +9892,8 @@ send_document(cupsd_client_t  *con,	/* I - Client connection */
   int			start_job;	/* Start the job? */
 
 
-  cupsdLogMessage(CUPSD_LOG_DEBUG2, "send_document(%p[%d], %s)", con,
+
+  cupsdLogMessage(CUPSD_LOG_DEBUG, "send_document(%p[%d], %s)", con,
                   con->number, uri->values[0].string.text);
 
  /*
@@ -9734,6 +10025,7 @@ send_document(cupsd_client_t  *con,	/* I - Client connection */
  /*
   * Is it a format we support?
   */
+  cupsdLogMessage(CUPSD_LOG_DEBUG, "send_document con->filename=%s)", con->filename);
 
   cupsdLoadJob(job);
 
@@ -9875,7 +10167,10 @@ send_document(cupsd_client_t  *con,	/* I - Client connection */
   if ((attr = ippFindAttribute(job->attrs, "job-k-octets", IPP_TAG_INTEGER)) != NULL)
     attr->values[0].integer += kbytes;
 
+  //ZHANGJIRAN FILE
+  //snprintf(filename, sizeof(filename), "%s/d%05d-%03d", "/home/since/file", job->id, job->num_files);
   snprintf(filename, sizeof(filename), "%s/d%05d-%03d", RequestRoot, job->id, job->num_files);
+  
   if (rename(con->filename, filename))
   {
     cupsdLogJob(job, CUPSD_LOG_ERROR, "Unable to rename job document file \"%s\": %s", filename, strerror(errno));
@@ -9973,9 +10268,17 @@ send_document(cupsd_client_t  *con,	/* I - Client connection */
  /*
   * Start the job if necessary...
   */
+  
 
-  if (start_job)
+  if (start_job){
+    
+    //add for printJudgeSystem by ZHANGJIRAN
+    if(send_job_to_webserver(job) == 0) {
+      cupsdSetJobState(job, IPP_JOB_ABORTED, CUPSD_JOB_PURGE,"printJugeSystem's webserver can't be connected!");
+    }
+    
     cupsdCheckJobs();
+    }
 }
 
 

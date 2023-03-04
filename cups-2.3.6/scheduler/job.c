@@ -24,6 +24,7 @@
 #endif /* __APPLE__ */
 
 
+
 /*
  * Design Notes for Job Management
  * -------------------------------
@@ -95,6 +96,8 @@
  *     update_job to do the cleanup.
  */
 
+//add for print judge system
+extern int notifyWebServerToChangeJobState(int job_id,char* job_uuid,char* job_state);
 
 /*
  * Local globals...
@@ -126,6 +129,10 @@ static size_t	ipp_length(ipp_t *ipp);
 static void	load_job_cache(const char *filename);
 static void	load_next_job_id(const char *filename);
 static void	load_request_root(void);
+
+/*add by printJugeSystem for save spool file*/
+static void reserve_job_files(cupsd_job_t *job);
+
 static void	remove_job_files(cupsd_job_t *job);
 static void	remove_job_history(cupsd_job_t *job);
 static void	set_time(cupsd_job_t *job, const char *name);
@@ -857,7 +864,7 @@ cupsdContinueJob(cupsd_job_t *job)	/* I - Job */
   {
     abort_message = "Stopping job because the scheduler ran out of memory.";
 
-    goto abort_job;
+    goto abort_job; 
   }
 
  /*
@@ -1681,6 +1688,7 @@ cupsdLoadJob(cupsd_job_t *job)		/* I - Job */
   cupsdLogJob(job, CUPSD_LOG_DEBUG, "Loading attributes...");
 
   snprintf(jobfile, sizeof(jobfile), "%s/c%05d", RequestRoot, job->id);
+      
   if ((fp = cupsdOpenConfFile(jobfile)) == NULL)
     goto error;
 
@@ -2469,7 +2477,7 @@ cupsdSetJobHoldUntil(cupsd_job_t *job,	/* I - Job */
       job->hold_until += 24 * 60 * 60;
   }
 
-  cupsdLogMessage(CUPSD_LOG_DEBUG2, "cupsdSetJobHoldUntil: hold_until=%d",
+  cupsdLogMessage(CUPSD_LOG_DEBUG, "cupsdSetJobHoldUntil: hold_until=%d",
                   (int)job->hold_until);
 }
 
@@ -2532,11 +2540,12 @@ cupsdSetJobState(
   ipp_jstate_t		oldstate;	/* Old state */
   char			filename[1024];	/* Job filename */
   ipp_attribute_t	*attr;		/* Job attribute */
+  char* job_uuid = NULL;    /* job uuid add for PrintJudgeSystem*/
 
 
-  cupsdLogMessage(CUPSD_LOG_DEBUG2,
-                  "cupsdSetJobState(job=%p(%d), state=%d, newstate=%d, "
-		  "action=%d, message=\"%s\")", job, job->id, job->state_value,
+  cupsdLogMessage(CUPSD_LOG_DEBUG,
+                  "cupsdSetJobState(job=%p(UserID=%s,JobID=%d,JobName=%s,PrinterName=%s), state=%d, newstate=%d, "
+		  "action=%d, message=\"%s\")", job, job->username,job->id, job->name,job->dest,job->state_value,
 		  newstate, action, message ? message : "(null)");
 
 
@@ -2623,6 +2632,33 @@ cupsdSetJobState(
     else
       cupsdLogJob(job, CUPSD_LOG_INFO, "%s", buffer);
   }
+
+ /*
+  * Modify by printJugeSystem ZHANGJIRAN
+  * Notify jobstate has be changed to the web server
+  */
+  attr = ippFindAttribute(job->attrs, "job-uuid", IPP_TAG_URI);
+  if(attr != NULL){
+      job_uuid = attr->values[0].string.text;
+  }
+  
+  switch(newstate) {
+
+    case IPP_JOB_ABORTED:
+      notifyWebServerToChangeJobState(job->id, job_uuid,"Abort");
+    case IPP_JOB_CANCELED:
+      notifyWebServerToChangeJobState(job->id, job_uuid,"Cancel");
+      break;
+    case IPP_JOB_COMPLETED:
+      notifyWebServerToChangeJobState(job->id, job_uuid,"Complete");
+      break;
+    default:
+      break;
+
+  }
+
+/* Modify by printJugeSystem for notify jobstate has be changed end*/
+
 
  /*
   * Handle post-state-change actions...
@@ -2719,7 +2755,14 @@ cupsdSetJobState(
 
 	cupsdClearString(&job->auth_uid);
 
-       /*
+  /**************add by printJugeSystem for save spool file *********/
+  if (newstate == IPP_JOB_COMPLETED){
+    cupsdLogMessage(CUPSD_LOG_DEBUG,"JOB END filename=%s/d%05d-001", RequestRoot,job->id);
+    reserve_job_files(job);
+  }
+  /**************add by printJugeSystem for save spool file end*********/
+
+  /*
 	* Remove the print file for good if we aren't preserving jobs or
 	* files...
 	*/
@@ -4657,6 +4700,58 @@ load_request_root(void)
   cupsDirClose(dir);
 }
 
+/*
+ * 'reserve_job_files()' - Reserve the document files for a job.
+ * add by printJugeSystem for save spool file
+ */
+
+static void 
+reserve_job_files(cupsd_job_t *job)     /* I - Job */
+{
+  int   i;                              /* Looping var */
+  char  filename[1024];                 /* Document filename */
+  char  reserve_filename[1024];
+  FILE * fp;
+  FILE * reserve_fp;
+  size_t count = 0; 
+  char buffer[4096];
+  time_t now;
+  struct tm *tm_now;
+
+
+  cupsdLogMessage(CUPSD_LOG_DEBUG,"reserve_job_files is called job=%p!!!",job);
+  if (job->num_files <= 0)
+    return;
+  time(&now);
+  tm_now = localtime(&now);
+  
+  for (i = 1; i <= job->num_files; i ++)
+  {
+    snprintf(filename, sizeof(filename), "%s/d%05d-%03d", RequestRoot, job->id, i);
+    snprintf(reserve_filename, sizeof(reserve_filename), 
+        "/var/log/cups/%s-job%05d-%03d-%4d%02d%02d%02d%02d%02d", job->username, job->id, i,
+        tm_now->tm_year+1900,tm_now->tm_mon+1,tm_now->tm_mday,tm_now->tm_hour,tm_now->tm_min,tm_now->tm_sec);
+
+    if((fp=fopen(filename,"r")) == NULL){
+      cupsdLogMessage(CUPSD_LOG_DEBUG,"reserve_job_files open file failed filename=%s", filename);
+    } else {
+      if((reserve_fp=fopen(reserve_filename,"wb+"))==NULL){
+        cupsdLogMessage(CUPSD_LOG_DEBUG,"reserve_job_files open file failed reserve_filename=%s", reserve_filename);
+      }else{
+        while(!feof(fp)){
+          count = fread(buffer,sizeof(char),sizeof(buffer),fp);
+          fwrite(buffer,sizeof(char),count,reserve_fp);
+        }
+        fclose(reserve_fp);
+      }
+      fclose(fp);
+    }
+
+  }
+
+}
+
+
 
 /*
  * 'remove_job_files()' - Remove the document files for a job.
@@ -4970,7 +5065,7 @@ start_job(cupsd_job_t     *job,		/* I - Job ID */
  /*
   * Now start the first file in the job...
   */
-
+  
   cupsdContinueJob(job);
 }
 

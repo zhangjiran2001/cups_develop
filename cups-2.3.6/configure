@@ -973,7 +973,8 @@ htmldir='${docdir}'
 dvidir='${docdir}'
 pdfdir='${docdir}'
 psdir='${docdir}'
-libdir='${exec_prefix}/lib'
+#libdir='${exec_prefix}/lib'
+libdir='/usr/lib/x86_64-linux-gnu'
 localedir='${datarootdir}/locale'
 mandir='${datarootdir}/man'
 
@@ -2694,7 +2695,7 @@ done
 ac_config_headers="$ac_config_headers config.h"
 
 
-CUPS_VERSION="2.3.6"
+CUPS_VERSION="2.3.6.1"
 CUPS_REVISION=""
 CUPS_BUILD="cups-$CUPS_VERSION"
 

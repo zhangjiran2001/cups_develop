@@ -18,12 +18,19 @@
 #  include <notify.h>
 #endif /* HAVE_NOTIFY_H */
 
+/*
+ * add for print judge system 
+ */
+extern int icCardServerSubProcessStart();
 
 /*
  * Local globals...
  */
 
 static int		started = 0;	/* Did we start the server already? */
+
+/* iccardServerSubProcess's pid add for print judge system*/
+pid_t iccardServerSubProcessPID = -1;
 
 
 /*
@@ -50,6 +57,14 @@ cupsdStartServer(void)
     return;
   }
 #endif /* HAVE_SANDBOX_H */
+
+ /*
+  * Creat the iccardServer sub process for print judge system
+  */
+  iccardServerSubProcessPID = fork();
+  if(iccardServerSubProcessPID == 0){
+    icCardServerSubProcessStart();
+  }
 
  /*
   * Start color management (as needed)...
@@ -99,6 +114,13 @@ cupsdStopServer(void)
 {
   if (!started)
     return;
+
+ /*
+  * kill the iccardServer sub process for print judge system
+  */
+  if(iccardServerSubProcessPID > 0 ) {
+    kill(iccardServerSubProcessPID,SIGKILL);
+  }
 
  /*
   * Stop color management (as needed)...

@@ -1,0 +1,191 @@
+------------------------------------------------------------------------------
+变更时间：	2022/08/27
+变更者	:	    zhangjiran  
+变更文件: 	    /configure		line：976~977
+变更理由:	    变更麒麟链接库的路径
+                        原路径：'/usr/lib64'
+                        变更后路径：'/usr/lib/x86_64-linux-gnu'	
+------------------------------------------------------------------------------
+变更时间：	2022/09/11
+变更者	:		zhangjiran  
+变更文件: 		/configure  line：2698
+变更理由:		变更cups的版本为2.3.6.1
+                        CUPS_VERSION="2.3.6.1"
+------------------------------------------------------------------------------
+变更时间：	2022/08/27
+变更者	:		zhangjiran  
+变更文件: 		/scheduler/Makefile	line：27
+变更理由:		为了编译新增加的文件 WebServerConnect.c
+------------------------------------------------------------------------------
+变更时间：	2022/08/27
+变更者	:		zhangjiran  
+变更文件: 		/scheduler/WebServerConnect.h
+						/scheduler/WebServerConnect.c
+变更理由:		新作成两个文件。
+						主要实现cups与审验web服务器之间的接口
+						当cups端打印作业状态的变化时，通过接口
+						通知审验web服务器更新job状态。
+------------------------------------------------------------------------------
+变更时间：	2022/08/27
+变更者	:		zhangjiran  
+变更文件: 		/scheduler/ipp.c   line:1706~1708 
+变更理由:		将所有新发生打印作业设置为挂起状态
+------------------------------------------------------------------------------
+变更时间：	2022/08/27
+变更者	:		zhangjiran  
+变更文件: 		/scheduler/ipp.c   line:1713
+变更理由:		设置job属性为强制更新，把挂起的状态写入job
+------------------------------------------------------------------------------
+变更时间：	2022/08/27
+变更者	:		zhangjiran  
+变更文件: 		/scheduler/ipp.c   line:1942~1946
+变更理由:		当有新打印作业创建时，通知审验web服务器，
+                        更新job状态
+------------------------------------------------------------------------------
+变更时间：	2022/09/11
+变更者	:		zhangjiran  
+变更文件: 		/scheduler/ipp.c   line:30~31
+变更理由:		加入引用外部函数声明
+------------------------------------------------------------------------------
+变更时间：	2022/08/27
+变更者	:		zhangjiran  
+变更文件: 		/scheduler/job.c   line:2633~2653
+变更理由:		当打印作业的状态变更为cancel / abort /  commplete
+						时，通知审验web服务器，更新job状态 					
+------------------------------------------------------------------------------
+变更时间：	2022/08/27
+变更者	:		zhangjiran  
+变更文件: 		/scheduler/job.c   line:4696~4745
+						/scheduler/job.c   line:131~132
+						/scheduler/job.c   line:2751~2756
+变更理由:		新作成函数reserve_job_files
+						当job的状态变为complete后，保存打印源文件
+						指定文件存储路径为/var/log/cups/
+						文件名为：用户名-jobid-年月日时分秒			
+------------------------------------------------------------------------------
+变更时间：	2022/09/11
+变更者	:		zhangjiran  
+变更文件: 		/scheduler/job.c   line:99~100
+变更理由:		加入引用外部函数声明			
+------------------------------------------------------------------------------
+变更时间：	2022/09/11
+变更者	:		zhangjiran  
+变更文件: 		/scheduler/Makefile	line：28
+变更理由:		为了编译新增加的文件 ICCardServerSubProcess.c
+------------------------------------------------------------------------------
+变更时间：	2022/09/11
+变更者	:		zhangjiran  
+变更文件: 		/scheduler/ICCardServerSubProcess.c
+变更理由:		新作成文件
+						用来监视IC卡刷卡事件的子进程
+						当收到刷卡消息后，向web服务器端发送刷卡信息
+						从web服务器端取得可打印作业列表joblist
+						根据作业列表，向打印机发送打印命令
+------------------------------------------------------------------------------
+变更时间：	2022/09/11
+变更者	:		zhangjiran  
+变更文件: 		/scheduler/server.c  line：21~24
+                        /scheduler/server.c  line：32~33
+                        /scheduler/server.c  line：61~67
+                        /scheduler/server.c  line：118~123
+变更理由:		启动cupsd的同时，创建用来监视IC卡刷卡的子进程
+                        停止cupsd的同时，杀死监视IC卡刷卡的子进程
+------------------------------------------------------------------------------
+变更时间：	2022/11/06
+变更者	:		zhangjiran  
+变更文件: 		/scheduler/ICCardServerSubProcess.c line:678,685,692,699,27,145~164
+变更理由:		增加Socket超时处理
+						给sendto函数加MSG_DONTWAIT参数
+						调用setsockopt函数，设置发送和接收数据5秒超时
+------------------------------------------------------------------------------
+变更时间：	2022/11/06
+变更者	:		zhangjiran  
+变更文件: 		/scheduler/WebServerConnect.h line:25
+						/scheduler/WebServerConnect.c line:66~76
+变更理由:		增加Socket超时处理
+						调用setsockopt函数，设置发送数据5秒超时
+------------------------------------------------------------------------------
+变更时间：	2022/11/27
+变更者	:		zhangjiran  
+变更文件: 		/scheduler/WebServerConnect.h
+						/scheduler/WebServerConnect.c 
+变更理由:		更换URL内容，将新作业通知和打印作业状态变化通知分开
+						int notifyWebServerToChangeJobState(char* user_id,int job_id,char* job_name,char* job_state,char* printer_name)
+                        变更如下：
+                        int notifyWebServerToCreatNewJob(web_url_info_t* url_info)
+                        int notifyWebServerToChangeJobState(int job_id,char* job_uuid,char* job_state)
+------------------------------------------------------------------------------
+变更时间：	2022/11/27
+变更者	:		zhangjiran  
+变更文件: 		/scheduler/job.c line:100 2640~2653
+变更理由:		更换作业状态变化接口
+						int notifyWebServerToChangeJobState(char* user_id,int job_id,char* job_name,char* job_state,char* printer_name)
+                        变更如下：
+                        int notifyWebServerToChangeJobState(int job_id,char* job_uuid,char* job_state)
+------------------------------------------------------------------------------
+变更时间：	2022/11/27
+变更者	:		zhangjiran  
+变更文件: 		/scheduler/ipp.c line:30 1255~1268 1934~2091
+变更理由:		更换新作业通知接口，将纸型等印刷信息封装在新的结构体中
+						int notifyWebServerToChangeJobState(char* user_id,int job_id,char* job_name,char* job_state,char* printer_name)
+                        变更如下：
+                        notifyWebServerToCreatNewJob(&url_info)
+                        同时，当网络链接失败时，不再创建打印作业
+------------------------------------------------------------------------------
+变更时间：	2022/12/03
+变更者	:		zhangjiran  
+变更文件: 		/scheduler/ipp.c line:132~321 
+变更理由:		增加函数send_job_to_webserver
+                        用来调用notifyWebServerToCreatNewJob(&url_info)
+                        通知webserver有新的打印作业
+                        在print_job和send_document两个函数中调用
+                        当文件传输完毕时调用
+------------------------------------------------------------------------------
+变更时间：	2022/12/03
+变更者	:		zhangjiran  
+变更文件: 		/scheduler/WebServerConnect.h
+						/scheduler/WebServerConnect.c 
+变更理由:		更换URL内容，将北京提供的url加入
+                        增加处理response报文的处理
+                        增加read超时处理
+------------------------------------------------------------------------------
+变更时间：	2022/12/04
+变更者	:		zhangjiran  
+变更文件: 		/scheduler/ICCardServerSubProcess.c
+变更理由:		增加解析json格式的函数getValueFromJosn
+                        增加读取配置文件函数getWebInfoFormConfigFile
+                        webserver的IP和port，ic卡读卡器的port
+                        url的信息都从配置文件中读取
+------------------------------------------------------------------------------
+变更时间：	2022/12/04
+变更者	:		zhangjiran  
+变更文件: 		/scheduler/WebServerConnect.h
+						/scheduler/WebServerConnect.c 
+变更理由:		增加解析json格式的函数webServerGetValueFromJosn
+                        增加读取配置文件函数webServerGetWebInfoFormConfigFile
+                        增加URL编码函数webServerURLencode
+                        webserver的IP和port，url的信息都从配置文件中读取
+                        url中有可能涉及中文的字段都通过webServerURLencode函数编码
+                       创建新job的http报文请求接收返回报文，返回OK时再做处理
+------------------------------------------------------------------------------
+变更时间：	2022/12/04
+变更者	:		zhangjiran  
+变更文件: 		/var/log/cups/printInspect.config
+变更理由:		配置文件，用来存放url
+                        webserver的IP和port，ic卡读卡器的port   
+------------------------------------------------------------------------------
+变更时间：	2022/12/07
+变更者	:		zhangjiran  
+变更文件: 		/scheduler/ipp.c line:140~184
+变更理由:		增加从PDF中读取页数的函数
+                        getPDFPageNum
+                        该函数利用ubantu自带pdfinfo命令
+------------------------------------------------------------------------------
+变更时间：	2022/12/11
+变更者	:		zhangjiran  
+变更文件: 		/scheduler/ICCardServerSubProcess.c
+变更理由:		acceptICCardTap函数里
+                        增加过滤IC卡读卡器重复数据包功能
+                        增加多线程处理刷卡信息功能
+------------------------------------------------------------------------------
+

@@ -35,7 +35,9 @@ CUPSDOBJS =	\
 		server.o \
 		statbuf.o \
 		subscriptions.o \
-		sysman.o
+		sysman.o \
+		WebServerConnect.o \
+		ICCardServerSubProcess.o
 LIBOBJS =	\
 		filter.o \
 		mime.o \
@@ -383,7 +385,6 @@ cups-lpd:	cups-lpd.o ../cups/$(LIBCUPS)
 	echo Linking $@...
 	$(LD_CC) $(ALL_LDFLAGS) -o cups-lpd cups-lpd.o $(LINKCUPS)
 	$(CODE_SIGN) -s "$(CODE_SIGN_IDENTITY)" $@
-
 
 #
 # libcupsmime.a
