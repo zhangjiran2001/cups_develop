@@ -15,7 +15,10 @@
  * Include necessary headers...
  */
 
-#include "cupsd.h"
+//#include "cupsd.h"
+//add for print judge system
+#include "WebServerConnect.h"
+
 #include <cups/ppd-private.h>
 
 #ifdef __APPLE__
@@ -26,9 +29,6 @@ extern int mbr_user_name_to_uuid(const char* name, uuid_t uu);
 extern int mbr_group_name_to_uuid(const char* name, uuid_t uu);
 extern int mbr_check_membership_by_id(uuid_t user, gid_t group, int* ismember);
 #endif /* __APPLE__ */
-
-//add for print judge system
-#include "WebServerConnect.h"
 
 /*
  * Local functions...
