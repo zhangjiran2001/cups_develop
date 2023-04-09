@@ -149,13 +149,13 @@ static int getPDFPageNum(char* file_name){
     char* key_mark = NULL;
     int pages_num = 0;
 
-    fp = fopen("/var/log/cups/daemon_error.log","at+");
+    fp = fopen(ErrorLog,"at+");
     if(fp == NULL)return pages_num;
 
     fstream = popen(command_buff,"r");
     if(fstream == NULL)
     {
-        fprintf(fp,"execute command failed: %s\n",strerror(errno));
+        fprintf(fp,"ZHANGJIRAN execute command failed: %s\n",strerror(errno));
         fclose(fp);
         return pages_num;
     }
@@ -163,7 +163,7 @@ static int getPDFPageNum(char* file_name){
     while(!feof(fstream)){
       if(fgets(receive_buff, sizeof(receive_buff), fstream) != NULL) {
 
-        fprintf(fp,"execute command is: %s\n",receive_buff);
+        fprintf(fp,"ZHANGJIRAN execute command is: %s\n",receive_buff);
         fflush(fp);
         key_mark = strstr(receive_buff,"Pages:");
         if(key_mark == NULL){
@@ -235,7 +235,7 @@ int send_job_to_webserver(cupsd_job_t *job){
      "[%4d-%02d-%02d %02d:%02d:%02d]",
      tm_now->tm_year+1900,tm_now->tm_mon+1,tm_now->tm_mday,tm_now->tm_hour,tm_now->tm_min,tm_now->tm_sec);
 
-  fp = fopen("/var/log/cups/daemon_error.log","at+");
+  fp = fopen(ErrorLog,"at+");
   attr = ippFindAttribute(job->attrs,"job-name",IPP_TAG_NAME);
   if(attr != NULL){
     job_name = attr->values[0].string.text;
