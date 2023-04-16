@@ -640,7 +640,7 @@ static void lpPrintByJobid(long* job_id_list,char* printer_name){
         for(i = job_id_list[0]; i>0; i--) {
 
                 memset(commad_buffer, 0, sizeof(commad_buffer));
-                snprintf(commad_buffer,sizeof(commad_buffer),"lp -d %s -H resume -i %ld",printer_name,job_id_list[i]);
+                snprintf(commad_buffer,sizeof(commad_buffer),"%s/../../bin/lp -d %s -o raw -H resume -i %ld",ServerBin,printer_name,job_id_list[i]);
 
                 system_ret = system(commad_buffer);
                 if(system_ret == -1){
