@@ -36,7 +36,7 @@
 #define CHANGE_JOB_STATE_URL "%s?JobID=%d&JobUUID=%s&JobState=%s"
 
 #define HTTP_MESSAGE_BUFSIZE 10240                                              //http send/receive message buffer size
-#define HTTP_TRANSLATE_TIMEOUT 30                                                //http translate timeout
+#define HTTP_TRANSLATE_TIMEOUT 5                                                //http translate timeout
 //#define ERROR_INFO_FILE_PATH "/var/log/cups/daemon_error.log"                   //errorinfomation file's path
 #define CONFIG_FILE_PATH "printInspect.config"                    //webserver config file's path
 

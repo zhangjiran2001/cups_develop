@@ -318,7 +318,7 @@ int notifyWebServerToCreatNewJob(web_url_info_t* url_info) {
 
         //connect to web server
         if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0){
-                fprintf(fp,"%s notifyWebServerToCreatNewJob: connect error!\n",time_string);
+                fprintf(fp,"%s notifyWebServerToCreatNewJob: connect error! errornum=%d\n",time_string,errno);
 		fclose(fp);
                 close(sockfd);
                 return -1;
