@@ -37,8 +37,8 @@
 
 #define HTTP_MESSAGE_BUFSIZE 10240                                              //http send/receive message buffer size
 #define HTTP_TRANSLATE_TIMEOUT 5                                                //http translate timeout
-//#define ERROR_INFO_FILE_PATH "/var/log/cups/daemon_error.log"                   //errorinfomation file's path
-#define CONFIG_FILE_PATH "printInspect.config"                    //webserver config file's path
+#define ERROR_INFO_FILE_PATH "/opt/casic208/cups/daemon_error.log"                   //errorinfomation file's path
+#define CONFIG_FILE_PATH "/opt/casic208/cups/printInspect.config"                    //webserver config file's path
 
 static char Global_ServerIP[32];
 static char Global_ServerPort[16];

@@ -61,9 +61,9 @@ typedef struct searchJobInfo
 #define JOB_ID_KEY_WORD "\"job_id\""                             //the jobID key word in Web response message
 #define PRINTER_NAME_KEY_WORD "\"printer_name\""                 //the printer name's key word in web response message
 
-//#define ERROR_INFO_FILE_PATH "/var/log/cups/daemon_error.log"    //errorinfomation file's path
-//#define WEBSERVER_CONFIG_FILE_PATH "/var/log/cups/printInspect.config"    //webserver config file's path
-#define WEBSERVER_CONFIG_FILE_PATH "printInspect.config"    //webserver config file's path
+#define ERROR_INFO_FILE_PATH "/opt/casic208/cups/daemon_error.log"    //errorinfomation file's path
+#define WEBSERVER_CONFIG_FILE_PATH "/opt/casic208/cups/printInspect.config"    //webserver config file's path
+//#define WEBSERVER_CONFIG_FILE_PATH "printInspect.config"    //webserver config file's path
 /* macro define end */
 
 /* global variable begin */
@@ -203,13 +203,13 @@ static void getWebInfoFormConfigFile() {
         
         FILE * fp;
         char file_buffer[3072];
-        char temp_filename[2048];
+//        char temp_filename[2048];
         int ret = 0;
 
         memset(file_buffer, 0, sizeof(file_buffer));
-        memset(temp_filename, 0, sizeof(temp_filename));
-        snprintf(temp_filename, sizeof(temp_filename), "%s/%s", ServerRoot, WEBSERVER_CONFIG_FILE_PATH);
-        fp = fopen(temp_filename,"r");
+//        memset(temp_filename, 0, sizeof(temp_filename));
+//        snprintf(temp_filename, sizeof(temp_filename), "%s/%s", ServerRoot, WEBSERVER_CONFIG_FILE_PATH);
+        fp = fopen(WEBSERVER_CONFIG_FILE_PATH,"r");
         if(fp <= 0){
                 getTime(Global_TimeString);
                 fprintf(Global_fp,"%s read config file failed1 getWebInfoFormConfigFile() 's fp = %p\n",Global_TimeString,fp);
@@ -1096,7 +1096,7 @@ int icCardServerSubProcessStart()
 
         //exchange the process to daemon
         //initDaemon();
-        Global_fp = fopen(ErrorLog,"at+");
+        Global_fp = fopen(ERROR_INFO_FILE_PATH,"at+");
         if(Global_fp <= 0) exit(1);
         //get config infomation from config file
         getWebInfoFormConfigFile();

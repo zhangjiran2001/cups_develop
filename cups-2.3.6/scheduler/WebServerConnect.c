@@ -17,7 +17,7 @@ int webServerURLencode(char *source_str, int source_str_len, char *target_str,in
         }
 
         FILE * debug_log_fp;
-        debug_log_fp = fopen(ErrorLog,"at+");
+        debug_log_fp = fopen(ERROR_INFO_FILE_PATH,"at+");
         if(debug_log_fp == NULL){
                 return 0;
         }
@@ -67,7 +67,7 @@ int webServerGetValueFromJosn(char* json_data,char* key_word,char* value_buf,int
         int value_len = 0;
 
         FILE * debug_log_fp;
-        debug_log_fp = fopen(ErrorLog,"at+");
+        debug_log_fp = fopen(ERROR_INFO_FILE_PATH,"at+");
         if(debug_log_fp == NULL){
                 return result;
         }
@@ -142,12 +142,12 @@ int webServerGetWebInfoFormConfigFile() {
         FILE * fp;
         FILE * debug_log_fp;
         char file_buffer[3072];
-        char temp_filename[2048];
+        //char temp_filename[2048];
         int ret = 0;
         memset(file_buffer, 0, sizeof(file_buffer));
-        memset(temp_filename, 0, sizeof(temp_filename));
+        //memset(temp_filename, 0, sizeof(temp_filename));
 
-        debug_log_fp = fopen(ErrorLog,"at+");
+        debug_log_fp = fopen(ERROR_INFO_FILE_PATH,"at+");
         if(debug_log_fp == NULL){
                 return 0;
         }
@@ -163,8 +163,8 @@ int webServerGetWebInfoFormConfigFile() {
                 "[%4d-%02d-%02d %02d:%02d:%02d]",
                 tm_now->tm_year+1900,tm_now->tm_mon+1,tm_now->tm_mday,tm_now->tm_hour,tm_now->tm_min,tm_now->tm_sec);
 
-        snprintf(temp_filename, sizeof(temp_filename), "%s/%s", ServerRoot, CONFIG_FILE_PATH);
-        fp = fopen(temp_filename,"r");
+        //snprintf(temp_filename, sizeof(temp_filename), "%s/%s", ServerRoot, CONFIG_FILE_PATH);
+        fp = fopen(CONFIG_FILE_PATH,"r");
         if(fp <= 0){
                 fprintf(debug_log_fp,"%s read config file failed1 webServerGetWebInfoFormConfigFile() 's fp = %p\n",time_string,fp);
 	        fflush(debug_log_fp);
@@ -243,7 +243,7 @@ int notifyWebServerToCreatNewJob(web_url_info_t* url_info) {
                 return -1;
         }
 
-        fp = fopen(ErrorLog,"at+");
+        fp = fopen(ERROR_INFO_FILE_PATH,"at+");
         if(fp == NULL){
                 return -1;
         }
@@ -433,7 +433,7 @@ int notifyWebServerToChangeJobState(int job_id,char* job_uuid,char* job_state) {
         if(webServerGetWebInfoFormConfigFile() == 0){
                 return -1;
         }
-        fp = fopen(ErrorLog,"at+");
+        fp = fopen(ERROR_INFO_FILE_PATH,"at+");
         if(fp == NULL){
                 return -1;
         }
