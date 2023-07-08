@@ -2,6 +2,7 @@
 #define _WEBSERVERCONECT_H_
 
 #include <stdio.h>
+#include <stdarg.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -65,6 +66,16 @@ typedef struct web_url_info_s
 } web_url_info_t;
 
 
+
+#define ZHANG_DEBUG_LOG  // 注释此行以禁用日志输出
+
+#ifdef ZHANG_DEBUG_LOG
+// 定义日志宏，可以接收可变数量的参数
+#define ZHANG_LOG(format, ...) writeLocalDebugLog(__FILE__, __LINE__, format, ##__VA_ARGS__)
+#else
+#define ZHANG_LOG(format, ...) ((void)0)
+#endif
+void writeLocalDebugLog(const char* filename, int line, const char* format, ...);
 /*FUNCTION      :creat a socket and connect to the WebServer to notify there is a new job  */
 /*INPUT         :web_url_info_t* url_info                                                  */
 /*OUTPUT        :int  --- >=1: success ; -1: failed                                        */

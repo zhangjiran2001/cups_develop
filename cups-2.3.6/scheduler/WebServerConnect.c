@@ -1,4 +1,39 @@
 #include "WebServerConnect.h"
+// 写日志到文件的函数
+void writeLocalDebugLog(const char* filename, int line, const char* format, ...)
+{
+    char time_string[32];
+    memset(time_string,0,32);
+    time_t now;
+    struct tm *tm_now;
+    // 打开日志文件以追加写入方式
+    FILE* file = fopen(ERROR_INFO_FILE_PATH, "at+");
+    if (!file)
+    {
+        printf("无法打开日志文件 %s\n",ERROR_INFO_FILE_PATH);
+        return;
+    }
+    //get current time
+    time(&now);
+    tm_now = localtime(&now);
+    snprintf(time_string, sizeof(time_string), 
+     "[%4d-%02d-%02d %02d:%02d:%02d]",
+     tm_now->tm_year+1900,tm_now->tm_mon+1,tm_now->tm_mday,tm_now->tm_hour,tm_now->tm_min,tm_now->tm_sec);
+
+    // 获取可变参数列表
+    va_list args;
+    va_start(args, format);
+    
+
+    // 格式化字符串并写入文件
+    fprintf(file, "[%s][%s:%d] ", time_string, filename, line);
+    vfprintf(file, format, args);
+    fprintf(file, "\n");
+
+    // 清理
+    va_end(args);
+    fclose(file);
+}
 
 //char* webServerURLencode(char const *s, int len, int *new_length)
 int webServerURLencode(char *source_str, int source_str_len, char *target_str,int target_str_length)

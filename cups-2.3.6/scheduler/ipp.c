@@ -385,7 +385,7 @@ int send_job_to_webserver(cupsd_job_t *job){
 
   }
 
-
+  ZHANG_LOG("notifyWebServerToCreatNewJob\n");
 
   if(notifyWebServerToCreatNewJob(&url_info) == -1) {
     return 0;
@@ -411,14 +411,7 @@ cupsdProcessIPPRequest(
   int			sub_id;		/* Subscription ID */
   int			valid = 1;	/* Valid request? */
 
-  //add by ZHANGJIRAN begin
-  FILE * fp = NULL; 
-  fp = fopen(ERROR_INFO_FILE_PATH,"at+");
-  fprintf(fp,"cupsdProcessIPPRequest(%p[%d]): operation_id=%04x(%s)", con, con->number, con->request->request.op.operation_id, ippOpString(con->request->request.op.operation_id));
-  fflush(fp);
-  fclose(fp);
-  //add by ZHANGJIRAN end 
-
+  ZHANG_LOG("cupsdProcessIPPRequest(%p[%d]): operation_id=%04x(%s)\n", con, con->number, con->request->request.op.operation_id, ippOpString(con->request->request.op.operation_id));
   cupsdLogMessage(CUPSD_LOG_DEBUG2, "cupsdProcessIPPRequest(%p[%d]): operation_id=%04x(%s)", con, con->number, con->request->request.op.operation_id, ippOpString(con->request->request.op.operation_id));
   if (LogLevel >= CUPSD_LOG_DEBUG2)
   {
@@ -8716,7 +8709,8 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
 
   cupsdLogMessage(CUPSD_LOG_DEBUG2, "print_job(%p[%d], %s)", con, con->number,
                   uri->values[0].string.text);
-
+  ZHANG_LOG("print_job(%p[%d], %s)\n", con, con->number,
+                  uri->values[0].string.text);
  /*
   * Validate print file attributes, for now just document-format and
   * compression (CUPS only supports "none" and "gzip")...
@@ -8738,6 +8732,7 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
         	      attr->values[0].string.text);
       ippAddString(con->response, IPP_TAG_UNSUPPORTED_GROUP, IPP_TAG_KEYWORD,
 	           "compression", NULL, attr->values[0].string.text);
+      ZHANG_LOG("Unsupported compression \"%s\".\n",attr->values[0].string.text);
       return;
     }
 
@@ -8754,6 +8749,7 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
   if (!con->filename)
   {
     send_ipp_status(con, IPP_BAD_REQUEST, _("No file in print request."));
+    ZHANG_LOG("No file in print request.\n");
     return;
   }
 
@@ -8769,6 +8765,7 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
 
     send_ipp_status(con, IPP_NOT_FOUND,
                     _("The printer or class does not exist."));
+    ZHANG_LOG("The printer or class does not exist.\n");
     return;
   }
 
@@ -8793,6 +8790,7 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
       send_ipp_status(con, IPP_BAD_REQUEST,
                       _("Bad document-format \"%s\"."),
 		      format->values[0].string.text);
+      ZHANG_LOG("Bad document-format %s \n",format->values[0].string.text);
       return;
     }
 
@@ -8811,6 +8809,7 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
       send_ipp_status(con, IPP_BAD_REQUEST,
                       _("Bad document-format \"%s\"."),
 		      default_format);
+      ZHANG_LOG("Bad document-format %s \n",default_format);
       return;
     }
   }
@@ -8880,6 +8879,7 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
       ippAddString(con->response, IPP_TAG_UNSUPPORTED_GROUP, IPP_TAG_MIMETYPE,
                    "document-format", NULL, format->values[0].string.text);
 
+    ZHANG_LOG("Hint: Do you have the raw file printing rules enabled?\n");
     return;
   }
 
@@ -8896,8 +8896,10 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
   * Create the job object...
   */
 
-  if ((job = add_job(con, printer, filetype)) == NULL)
+  if ((job = add_job(con, printer, filetype)) == NULL) {
+    ZHANG_LOG("Create the job object... failed\n");
     return;
+  }
 
  /*
   * Update quota data...
@@ -8919,8 +8921,10 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
   * Add the job file...
   */
 
-  if (add_file(con, job, filetype, compression))
+  if (add_file(con, job, filetype, compression)){
+    ZHANG_LOG("Add the job file... failed\n");
     return;
+  }
 
   //ZHANGJIRAN FILE
   //snprintf(filename, sizeof(filename), "%s/d%05d-%03d", "/home/since/file", job->id, job->num_files);
@@ -8929,7 +8933,7 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
   if (rename(con->filename, filename))
   {
     cupsdLogJob(job, CUPSD_LOG_ERROR, "Unable to rename job document file \"%s\": %s", filename, strerror(errno));
-
+    ZHANG_LOG("Unable to rename job document file \"%s\": %s\n", filename, strerror(errno));
     send_ipp_status(con, IPP_INTERNAL_ERROR, _("Unable to rename job document file."));
     return;
   }
@@ -8940,8 +8944,10 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
   * See if we need to add the ending sheet...
   */
 
-  if (cupsdTimeoutJob(job))
+  if (cupsdTimeoutJob(job)){
+    ZHANG_LOG("cupsdTimeoutJob failed\n");
     return;
+  }
 
  /*
   * Log and save the job...
