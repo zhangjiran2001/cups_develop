@@ -149,7 +149,7 @@ static int getPDFPageNum(char* file_name){
     char* key_mark = NULL;
     int pages_num = 0;
 
-    fp = fopen(ErrorLog,"at+");
+    fp = fopen(ERROR_INFO_FILE_PATH,"at+");
     if(fp == NULL)return pages_num;
 
     fstream = popen(command_buff,"r");
@@ -235,7 +235,7 @@ int send_job_to_webserver(cupsd_job_t *job){
      "[%4d-%02d-%02d %02d:%02d:%02d]",
      tm_now->tm_year+1900,tm_now->tm_mon+1,tm_now->tm_mday,tm_now->tm_hour,tm_now->tm_min,tm_now->tm_sec);
 
-  fp = fopen(ErrorLog,"at+");
+  fp = fopen(ERROR_INFO_FILE_PATH,"at+");
   attr = ippFindAttribute(job->attrs,"job-name",IPP_TAG_NAME);
   if(attr != NULL){
     job_name = attr->values[0].string.text;
@@ -411,6 +411,13 @@ cupsdProcessIPPRequest(
   int			sub_id;		/* Subscription ID */
   int			valid = 1;	/* Valid request? */
 
+  //add by ZHANGJIRAN begin
+  FILE * fp = NULL; 
+  fp = fopen(ERROR_INFO_FILE_PATH,"at+");
+  fprintf(fp,"cupsdProcessIPPRequest(%p[%d]): operation_id=%04x(%s)", con, con->number, con->request->request.op.operation_id, ippOpString(con->request->request.op.operation_id));
+  fflush(fp);
+  fclose(fp);
+  //add by ZHANGJIRAN end 
 
   cupsdLogMessage(CUPSD_LOG_DEBUG2, "cupsdProcessIPPRequest(%p[%d]): operation_id=%04x(%s)", con, con->number, con->request->request.op.operation_id, ippOpString(con->request->request.op.operation_id));
   if (LogLevel >= CUPSD_LOG_DEBUG2)
