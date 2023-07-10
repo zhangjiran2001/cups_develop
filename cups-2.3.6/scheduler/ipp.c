@@ -249,6 +249,9 @@ int send_job_to_webserver(cupsd_job_t *job){
   fflush(fp);
 
   snprintf(paper_size,sizeof(paper_size),"%s", _ppdCacheGetPageSize(printer->pc, job->attrs, NULL, &exact));
+  if(strncmp(paper_size,"(null)",6) == 0 ){
+    snprintf(paper_size,sizeof(paper_size),"A4");
+  }
 
   fprintf(fp,"PageSize=%s strlen PageSize=%ld\n",paper_size,strlen(paper_size));
   fflush(fp);
