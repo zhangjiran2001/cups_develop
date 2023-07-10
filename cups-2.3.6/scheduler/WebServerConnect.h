@@ -27,7 +27,8 @@
 #define SERVER_PORT_KEY_WORD "web_server_port"
 #define NEW_JOB_URL_KEY_WORD "URL_printSaveState" 
 #define CHANGE_JOB_STATE_URL_KEY_WORD "URL_stateChange" 
-#define RESPONSE_RESULT_KEY_WORD "response_result"                        
+#define RESPONSE_RESULT_KEY_WORD "response_result"  
+#define ID_CARD_KEY_WORD "ID_Card_Num"                      
 
 
 #define NEW_JOB_URL "%s?PID=%s\
@@ -45,6 +46,7 @@ static char Global_ServerIP[32];
 static char Global_ServerPort[16];
 static char Global_NewJobURL[2048];
 static char Global_ChangeJobStateURL[2048];
+static char Global_ID[128];
 
 typedef struct web_url_info_s		
 {

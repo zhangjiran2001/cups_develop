@@ -243,9 +243,14 @@ int webServerGetWebInfoFormConfigFile() {
                 return 0;  
         }
 
+        if(webServerGetValueFromJosn(file_buffer,ID_CARD_KEY_WORD,Global_ID,sizeof(Global_ID)) != 1){
+                fclose(debug_log_fp);
+                return 0;  
+        }
 
-        fprintf(debug_log_fp,"%s \nGlobal_ServerIP=%s\nGlobal_ServerPort=%s\nGlobal_NewJobURL=%s\nGlobal_ChangeJobStateURL=%s\n",
-        time_string,Global_ServerIP,Global_ServerPort,Global_NewJobURL,Global_ChangeJobStateURL);
+
+        fprintf(debug_log_fp,"%s \nGlobal_ServerIP=%s\nGlobal_ServerPort=%s\nGlobal_NewJobURL=%s\nGlobal_ChangeJobStateURL=%s\nGlobal_ID=%s\n",
+        time_string,Global_ServerIP,Global_ServerPort,Global_NewJobURL,Global_ChangeJobStateURL,Global_ID);
         fflush(debug_log_fp);
         fclose(debug_log_fp);
         return 1;
@@ -373,7 +378,7 @@ int notifyWebServerToCreatNewJob(web_url_info_t* url_info) {
         }
 
 
-        snprintf(url,2048,NEW_JOB_URL,Global_NewJobURL,url_info->user_name,url_info->job_id,url_info->job_uuid,encode_url_job_name,
+        snprintf(url,2048,NEW_JOB_URL,Global_NewJobURL,Global_ID,url_info->job_id,url_info->job_uuid,encode_url_job_name,
                  url_info->job_state,encode_url_printer_name,url_info->paper_size,url_info->media_type,
                  url_info->copies,url_info->mopies,url_info->duplex,url_info->color_mode,url_info->file_num,
                  url_info->filePath,url_info->pages_num);
