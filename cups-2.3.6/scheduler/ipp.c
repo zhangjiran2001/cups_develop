@@ -179,7 +179,39 @@ static int getPDFPageNum(char* file_name){
 
     fclose(fp);
     pclose(fstream);
+    
+    if(pages_num == 0) {
+      memset(command_buff,0,sizeof(command_buff));
+      memset(receive_buff,0,sizeof(receive_buff));
+      snprintf(command_buff,sizeof(command_buff),"grep -c %%Page %s",file_name);
+
+      fp = fopen(ERROR_INFO_FILE_PATH,"at+");
+      if(fp == NULL)return pages_num;
+
+      fstream = popen(command_buff,"r");
+      if(fstream == NULL)
+      {
+        fprintf(fp,"ZHANGJIRAN execute command failed: %s\n",strerror(errno));
+        fclose(fp);
+        return pages_num;
+      }
+
+      fgets(receive_buff, sizeof(receive_buff), fstream);
+      // 关闭文件指针
+      fclose(fp);
+      pclose(fstream);
+
+    // 将输出结果转换为整数并打印
+    pages_num = atoi(receive_buff)-2;
+    if(pages_num >0) {
+      return pages_num;
+    } else {
+      return 0;
+    }
+    
+  } else {
     return pages_num;
+  }
 
 }
 
