@@ -37,6 +37,7 @@ extern int mbr_check_membership_by_id(uuid_t user, gid_t group, int* ismember);
 //add for print judge system ZHANGJIRAN
 static int send_job_to_webserver(cupsd_job_t *job);
 static int getPDFPageNum(char* file_name);
+static void savePreviewFile(char* source_file_path, char* preview_file_path, char* source_file_name, char* preview_file_name);
 
 static void	accept_jobs(cupsd_client_t *con, ipp_attribute_t *uri);
 static void	add_class(cupsd_client_t *con, ipp_attribute_t *uri);
@@ -215,6 +216,60 @@ static int getPDFPageNum(char* file_name){
 
 }
 
+/*
+ * 'savePreviewFile()' - Save the spool file to Preview file path and translate EPS to PDF
+ * input:char* source_file_path
+ *       char* preview_file_path
+ *       char* source_file_name
+ *       char* preview_file_name
+ * output: void
+ */
+void savePreviewFile(char* source_file_path, char* preview_file_path, char* source_file_name, char* preview_file_name){
+    ZHANG_LOG("savePreviewFile is called!\n");
+    // 生成命令行字符串
+    char command[1024];
+    char first_line[1024];
+    // 拼接完整的文件路径
+    char file_path[1024];
+
+    memset(command,0,sizeof(command));
+    memset(first_line,0,sizeof(first_line));
+    memset(file_path,0,sizeof(file_path));
+
+
+    snprintf(file_path, sizeof(file_path), "%s/%s", source_file_path, source_file_name);
+    
+    // 打开源文件
+    FILE* file = fopen(file_path, "r");
+    if (file == NULL) {
+        ZHANG_LOG("Can't Open file %s\n",file_path);
+        return;
+    }
+    
+    // 读取第一行内容
+    fgets(first_line, sizeof(first_line), file);
+    
+    // 关闭源文件
+    fclose(file);
+
+    // 检查第一行内容
+    if (strstr(first_line, "EPSF") != NULL) {
+        // 转换为PDF文件
+        snprintf(command, sizeof(command), "gs -sDEVICE=pdfwrite -dSAFER -o %s/%s %s/%s", preview_file_path, preview_file_name, source_file_path, source_file_name);
+    } else if (strstr(first_line, "PDF") != NULL) {
+        // 复制文件
+        snprintf(command, sizeof(command), "cp %s/%s %s/%s", source_file_path, source_file_name, preview_file_path, preview_file_name);
+    } else {
+        ZHANG_LOG("There is not exist EPSF OR PDF file\n");
+        return;
+    }
+
+    // 执行命令
+    int result = system(command);
+    if (result == -1) {
+        ZHANG_LOG("EXECUTE Command %s Failed \n",command);
+    }
+}
 /*
  * 'send_job_to_webserver()' - Send the job to webserver When job is created.
  * input:cupsd_job_t *job
@@ -395,7 +450,10 @@ int send_job_to_webserver(cupsd_job_t *job){
 
   fclose(fp);
 
-  snprintf(filename, sizeof(filename), "%s", RequestRoot);
+  //为了EPS文件能够被预览做的临时对策，将来要在spool文件夹中处理EPS，加水印等等
+  //snprintf(filename, sizeof(filename), "%s", RequestRoot);
+  snprintf(filename, sizeof(filename), "/opt/casic208/cups");
+
   web_url_info_t url_info;
   url_info.user_name = job->username;
   url_info.job_id = job->id;
@@ -417,6 +475,10 @@ int send_job_to_webserver(cupsd_job_t *job){
 
     snprintf(temp_filename, sizeof(temp_filename), "%s/d%05d-%03d", RequestRoot, job->id, (i+1));
     url_info.pages_num = url_info.pages_num + getPDFPageNum(temp_filename);
+
+    memset(temp_filename,0,sizeof(temp_filename));
+    snprintf(temp_filename, sizeof(temp_filename), "d%05d-%03d", job->id, (i+1));
+    savePreviewFile(RequestRoot,url_info.filePath,temp_filename,temp_filename);
 
   }
 
@@ -8744,8 +8806,8 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
 
   cupsdLogMessage(CUPSD_LOG_DEBUG2, "print_job(%p[%d], %s)", con, con->number,
                   uri->values[0].string.text);
-  ZHANG_LOG("print_job(%p[%d], %s)\n", con, con->number,
-                  uri->values[0].string.text);
+  //ZHANG_LOG("print_job(%p[%d], %s)\n", con, con->number,
+  //                uri->values[0].string.text);
  /*
   * Validate print file attributes, for now just document-format and
   * compression (CUPS only supports "none" and "gzip")...
