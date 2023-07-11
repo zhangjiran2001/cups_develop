@@ -230,19 +230,44 @@ void savePreviewFile(char* source_file_path, char* preview_file_path, char* sour
     char command[1024];
     char first_line[1024];
     // 拼接完整的文件路径
-    char file_path[1024];
+    char source_file[1024];
+    char preview_file[1024];
+    FILE* s_fp = NULL;
+    FILE* p_fp = NULL;
+    size_t count = 0;
+    char buffer[4096];
 
     memset(command,0,sizeof(command));
     memset(first_line,0,sizeof(first_line));
-    memset(file_path,0,sizeof(file_path));
+    memset(source_file,0,sizeof(source_file));
+    memset(preview_file,0,sizeof(preview_file));
+    memset(buffer,0,sizeof(buffer));
 
 
-    snprintf(file_path, sizeof(file_path), "%s/%s", source_file_path, source_file_name);
+    snprintf(source_file, sizeof(source_file), "%s/%s", source_file_path, source_file_name);
+    snprintf(preview_file, sizeof(preview_file), "%s/%s", preview_file_path, preview_file_name);
+
+    if((s_fp=fopen(source_file,"r")) == NULL){
+      ZHANG_LOG("source_file open file failed filename=%s", source_file);
+    } else {
+      if((p_fp=fopen(preview_file,"wb+"))==NULL){
+        ZHANG_LOG("preview_file open file failed preview_file=%s", preview_file);
+      }else{
+        while(!feof(s_fp)){
+          count = fread(buffer,sizeof(char),sizeof(buffer),s_fp);
+          fwrite(buffer,sizeof(char),count,p_fp);
+        }
+        fclose(p_fp);
+        p_fp = NULL;
+      }
+      fclose(s_fp);
+      s_fp = NULL;
+    }
     
     // 打开源文件
-    FILE* file = fopen(file_path, "r");
+    FILE* file = fopen(preview_file, "r");
     if (file == NULL) {
-        ZHANG_LOG("Can't Open file %s\n",file_path);
+        ZHANG_LOG("Can't Open file %s\n",preview_file);
         return;
     }
     
@@ -255,10 +280,10 @@ void savePreviewFile(char* source_file_path, char* preview_file_path, char* sour
     // 检查第一行内容
     if (strstr(first_line, "EPSF") != NULL) {
         // 转换为PDF文件
-        snprintf(command, sizeof(command), "gs -sDEVICE=pdfwrite -dSAFER -o %s/%s %s/%s", preview_file_path, preview_file_name, source_file_path, source_file_name);
+        snprintf(command, sizeof(command), "gs -sDEVICE=pdfwrite -dSAFER -o %s %s", preview_file, preview_file);
     } else if (strstr(first_line, "PDF") != NULL) {
-        // 复制文件
-        snprintf(command, sizeof(command), "cp %s/%s %s/%s", source_file_path, source_file_name, preview_file_path, preview_file_name);
+        // do nothing
+        
     } else {
         ZHANG_LOG("There is not exist EPSF OR PDF file\n");
         return;
