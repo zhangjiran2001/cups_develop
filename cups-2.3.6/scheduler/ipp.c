@@ -280,7 +280,7 @@ void savePreviewFile(char* source_file_path, char* preview_file_path, char* sour
     // 检查第一行内容
     if (strstr(first_line, "EPSF") != NULL) {
         // 转换为PDF文件
-        snprintf(command, sizeof(command), "gs -sDEVICE=pdfwrite -dSAFER -o %s %s", preview_file, preview_file);
+        snprintf(command, sizeof(command), "gs -sDEVICE=pdfwrite -dSAFER -dCompatibilityLevel=1.4 -dNOPAUSE -dBATCH -sOutputFile=%s %s", preview_file, preview_file);
     } else if (strstr(first_line, "PDF") != NULL) {
         // do nothing
         
