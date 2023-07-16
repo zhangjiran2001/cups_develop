@@ -65,6 +65,7 @@ typedef struct web_url_info_s
   int       file_num;
   char*     filePath;
   int       pages_num;
+  char*     IP_adress;
 } web_url_info_t;
 
 
