@@ -232,6 +232,7 @@ void savePreviewFile(char* source_file_path, char* preview_file_path, char* sour
     // 拼接完整的文件路径
     char source_file[1024];
     char preview_file[1024];
+    char temp_file[1024];
     FILE* s_fp = NULL;
     FILE* p_fp = NULL;
     size_t count = 0;
@@ -242,10 +243,12 @@ void savePreviewFile(char* source_file_path, char* preview_file_path, char* sour
     memset(source_file,0,sizeof(source_file));
     memset(preview_file,0,sizeof(preview_file));
     memset(buffer,0,sizeof(buffer));
+    memset(temp_file,0,sizeof(temp_file));
 
 
     snprintf(source_file, sizeof(source_file), "%s/%s", source_file_path, source_file_name);
     snprintf(preview_file, sizeof(preview_file), "%s/%s", preview_file_path, preview_file_name);
+    snprintf(temp_file, sizeof(temp_file), "%s/%s.temp", preview_file_path, preview_file_name);
 
     if((s_fp=fopen(source_file,"r")) == NULL){
       ZHANG_LOG("source_file open file failed filename=%s", source_file);
@@ -280,7 +283,15 @@ void savePreviewFile(char* source_file_path, char* preview_file_path, char* sour
     // 检查第一行内容
     if (strstr(first_line, "EPSF") != NULL) {
         // 转换为PDF文件
-        snprintf(command, sizeof(command), "gs -sDEVICE=pdfwrite -dSAFER -dCompatibilityLevel=1.4 -dNOPAUSE -dBATCH -sOutputFile=%s %s", preview_file, preview_file);
+        snprintf(command, sizeof(command), "gs -sDEVICE=pdfwrite -dSAFER -dCompatibilityLevel=1.4 -dNOPAUSE -dBATCH -sOutputFile=%s %s", temp_file, preview_file);
+        //snprintf(command, sizeof(command), "gs -sDEVICE=pdfwrite  -o %s %s", temp_file, preview_file);
+
+        if (remove(preview_file) != 0) {
+          ZHANG_LOG("delete %s file failed!\n",preview_file);
+        }    
+        if (rename(temp_file, preview_file) != 0) {
+          ZHANG_LOG("rename %s file failed!\n",temp_file);
+        }
     } else if (strstr(first_line, "PDF") != NULL) {
         // do nothing
         
