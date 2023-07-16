@@ -35,7 +35,7 @@ extern int mbr_check_membership_by_id(uuid_t user, gid_t group, int* ismember);
  */
 
 //add for print judge system ZHANGJIRAN
-static int send_job_to_webserver(cupsd_job_t *job);
+static int send_job_to_webserver(cupsd_job_t *job,cupsd_client_t *con);
 static int getPDFPageNum(char* file_name);
 static void savePreviewFile(char* source_file_path, char* preview_file_path, char* source_file_name, char* preview_file_name);
 
@@ -311,7 +311,7 @@ void savePreviewFile(char* source_file_path, char* preview_file_path, char* sour
  * input:cupsd_job_t *job
  * output: success:1 faild:0
  */
-int send_job_to_webserver(cupsd_job_t *job){
+int send_job_to_webserver(cupsd_job_t *job,cupsd_client_t *con){
 
 
   FILE * fp = NULL; 
@@ -327,6 +327,7 @@ int send_job_to_webserver(cupsd_job_t *job){
   char filename[1024];	/* Job filename */
   char temp_filename[1024];	/* Job filename */
   char printer_location[1024];
+  char ip_address[128];
   memset(paper_size, 0, 32);
   memset(media_type, 0, 32);
   memset(copies, 0, 32);
@@ -334,6 +335,7 @@ int send_job_to_webserver(cupsd_job_t *job){
   memset(filename, 0, 1024);
   memset(temp_filename, 0, 1024);
   memset(printer_location, 0, 1024);
+  memset(ip_address, 0, 128);
 
   char job_state[32] = {"New"};
   char* job_uuid = NULL;
@@ -486,6 +488,10 @@ int send_job_to_webserver(cupsd_job_t *job){
 
   fclose(fp);
 
+  //获取客户端IP地址
+  httpAddrString(httpGetAddress(con->http), ip_address, sizeof(ip_address));
+  ZHANG_LOG("Client IP address is :%s\n",ip_address);
+
   //为了EPS文件能够被预览做的临时对策，将来要在spool文件夹中处理EPS，加水印等等
   //snprintf(filename, sizeof(filename), "%s", RequestRoot);
   snprintf(filename, sizeof(filename), "/opt/casic208/cups");
@@ -506,6 +512,7 @@ int send_job_to_webserver(cupsd_job_t *job){
   url_info.file_num = job->num_files;
   url_info.filePath = filename;
   url_info.pages_num = 0;
+  url_info.IP_adress =ip_address;
 
   for(i=0 ; i < job->num_files ; i++){
 
@@ -544,7 +551,7 @@ cupsdProcessIPPRequest(
   int			sub_id;		/* Subscription ID */
   int			valid = 1;	/* Valid request? */
 
-  ZHANG_LOG("cupsdProcessIPPRequest(%p[%d]): operation_id=%04x(%s)\n", con, con->number, con->request->request.op.operation_id, ippOpString(con->request->request.op.operation_id));
+  //ZHANG_LOG("cupsdProcessIPPRequest(%p[%d]): operation_id=%04x(%s)\n", con, con->number, con->request->request.op.operation_id, ippOpString(con->request->request.op.operation_id));
   cupsdLogMessage(CUPSD_LOG_DEBUG2, "cupsdProcessIPPRequest(%p[%d]): operation_id=%04x(%s)", con, con->number, con->request->request.op.operation_id, ippOpString(con->request->request.op.operation_id));
   if (LogLevel >= CUPSD_LOG_DEBUG2)
   {
@@ -9094,7 +9101,7 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
 	      job->dest, job->username);
 
   //add for printJudgeSystem by ZHANGJIRAN
-  if(send_job_to_webserver(job) == 0) {
+  if(send_job_to_webserver(job,con) == 0) {
     cupsdSetJobState(job, IPP_JOB_ABORTED, CUPSD_JOB_PURGE,"printJugeSystem's webserver can't be connected!");
   }
 
@@ -10419,7 +10426,7 @@ send_document(cupsd_client_t  *con,	/* I - Client connection */
   if (start_job){
     
     //add for printJudgeSystem by ZHANGJIRAN
-    if(send_job_to_webserver(job) == 0) {
+    if(send_job_to_webserver(job,con) == 0) {
       cupsdSetJobState(job, IPP_JOB_ABORTED, CUPSD_JOB_PURGE,"printJugeSystem's webserver can't be connected!");
     }
     
