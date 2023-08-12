@@ -250,11 +250,15 @@ void savePreviewFile(char* source_file_path, char* preview_file_path, char* sour
     snprintf(preview_file, sizeof(preview_file), "%s/%s", preview_file_path, preview_file_name);
     snprintf(temp_file, sizeof(temp_file), "%s/%s.temp", preview_file_path, preview_file_name);
 
-    if((s_fp=fopen(source_file,"r")) == NULL){
+    if((s_fp=fopen(source_file,"r")) == NULL) {
       ZHANG_LOG("source_file open file failed filename=%s", source_file);
+      return;
     } else {
       if((p_fp=fopen(preview_file,"wb+"))==NULL){
         ZHANG_LOG("preview_file open file failed preview_file=%s", preview_file);
+        fclose(s_fp);
+        s_fp = NULL;
+        return;
       }else{
         while(!feof(s_fp)){
           count = fread(buffer,sizeof(char),sizeof(buffer),s_fp);
@@ -262,22 +266,23 @@ void savePreviewFile(char* source_file_path, char* preview_file_path, char* sour
         }
         fclose(p_fp);
         p_fp = NULL;
+        fclose(s_fp);
+        s_fp = NULL;
       }
-      fclose(s_fp);
-      s_fp = NULL;
+
     }
     
-    // 打开源文件
+    // 打开预览文件
     FILE* file = fopen(preview_file, "r");
     if (file == NULL) {
-        ZHANG_LOG("Can't Open file %s\n",preview_file);
+        ZHANG_LOG("Can't Open preview file %s\n",preview_file);
         return;
     }
     
     // 读取第一行内容
     fgets(first_line, sizeof(first_line), file);
     
-    // 关闭源文件
+    // 关闭预览文件
     fclose(file);
 
     // 检查第一行内容
@@ -285,6 +290,12 @@ void savePreviewFile(char* source_file_path, char* preview_file_path, char* sour
         // 转换为PDF文件
         snprintf(command, sizeof(command), "gs -sDEVICE=pdfwrite -dSAFER -dCompatibilityLevel=1.4 -dNOPAUSE -dBATCH -sOutputFile=%s %s", temp_file, preview_file);
         //snprintf(command, sizeof(command), "gs -sDEVICE=pdfwrite  -o %s %s", temp_file, preview_file);
+        // 执行命令
+        int result = system(command);
+        if (result == -1) {
+          ZHANG_LOG("EXECUTE ghostscript Command %s Failed \n",command);
+          return;
+        }
 
         if (remove(preview_file) != 0) {
           ZHANG_LOG("delete %s file failed!\n",preview_file);
@@ -300,11 +311,6 @@ void savePreviewFile(char* source_file_path, char* preview_file_path, char* sour
         return;
     }
 
-    // 执行命令
-    int result = system(command);
-    if (result == -1) {
-        ZHANG_LOG("EXECUTE Command %s Failed \n",command);
-    }
 }
 /*
  * 'send_job_to_webserver()' - Send the job to webserver When job is created.
