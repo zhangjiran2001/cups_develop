@@ -33,7 +33,7 @@
 
 #define NEW_JOB_URL "%s?PID=%s\
 &JobID=%d&JobUUID=%s&JobName=%s&JobState=%s&PrinterName=%s\
-&PaperSize=%s&MediaType=%s&Copies=%s&Mopies=%s&Duplex=%s&ColorMode=%s&FileNum=%d&FilePath=%s&PagesNum=%d"    //web server 's URL
+&PaperSize=%s&MediaType=%s&Copies=%s&Mopies=%s&Duplex=%s&ColorMode=%s&FileNum=%d&PreViewFilePath=%s&FilePath=%s&PagesNum=%d"    //web server 's URL
 
 #define CHANGE_JOB_STATE_URL "%s?JobID=%d&JobUUID=%s&JobState=%s"
 
@@ -64,6 +64,7 @@ typedef struct web_url_info_s
   char*     color_mode;
   int       file_num;
   char*     filePath;
+  char*     preViewFilePath;
   int       pages_num;
   char*     IP_adress;
 } web_url_info_t;

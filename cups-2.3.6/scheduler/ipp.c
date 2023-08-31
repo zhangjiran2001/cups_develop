@@ -330,7 +330,8 @@ int send_job_to_webserver(cupsd_job_t *job,cupsd_client_t *con){
   char media_type[32];
   char copies[32];
   char mopies[32];
-  char filename[1024];	/* Job filename */
+  char file_path[1024];	/* spool file path */
+  char preview_file_path[1024];
   char temp_filename[1024];	/* Job filename */
   char printer_location[1024];
   char ip_address[128];
@@ -338,7 +339,8 @@ int send_job_to_webserver(cupsd_job_t *job,cupsd_client_t *con){
   memset(media_type, 0, 32);
   memset(copies, 0, 32);
   memset(mopies, 0, 32);
-  memset(filename, 0, 1024);
+  memset(file_path, 0, 1024);
+  memset(preview_file_path, 0, 1024);
   memset(temp_filename, 0, 1024);
   memset(printer_location, 0, 1024);
   memset(ip_address, 0, 128);
@@ -498,9 +500,10 @@ int send_job_to_webserver(cupsd_job_t *job,cupsd_client_t *con){
   httpAddrString(httpGetAddress(con->http), ip_address, sizeof(ip_address));
   ZHANG_LOG("Client IP address is :%s\n",ip_address);
 
-  //为了EPS文件能够被预览做的临时对策，将来要在spool文件夹中处理EPS，加水印等等
-  //snprintf(filename, sizeof(filename), "%s", RequestRoot);
-  snprintf(filename, sizeof(filename), "/opt/casic208/cups");
+  //打印中间spool文件夹的路径，利用中间文件处理PDF，EPS，加水印等等
+  snprintf(file_path, sizeof(file_path), "%s", RequestRoot);
+  //预览文件所在路径，用来给网页提供PDF预览文件
+  snprintf(preview_file_path, sizeof(preview_file_path), "/opt/casic208/cups");
 
   web_url_info_t url_info;
   url_info.user_name = job->username;
@@ -516,7 +519,8 @@ int send_job_to_webserver(cupsd_job_t *job,cupsd_client_t *con){
   url_info.duplex = duplex;
   url_info.color_mode = color_mode;
   url_info.file_num = job->num_files;
-  url_info.filePath = filename;
+  url_info.filePath = file_path;
+  url_info.preViewFilePath = preview_file_path;
   url_info.pages_num = 0;
   url_info.IP_adress =ip_address;
 
@@ -527,7 +531,7 @@ int send_job_to_webserver(cupsd_job_t *job,cupsd_client_t *con){
 
     memset(temp_filename,0,sizeof(temp_filename));
     snprintf(temp_filename, sizeof(temp_filename), "d%05d-%03d", job->id, (i+1));
-    savePreviewFile(RequestRoot,url_info.filePath,temp_filename,temp_filename);
+    savePreviewFile(url_info.filePath,url_info.preViewFilePath,temp_filename,temp_filename);
 
   }
 

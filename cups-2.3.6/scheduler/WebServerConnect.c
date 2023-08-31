@@ -381,7 +381,7 @@ int notifyWebServerToCreatNewJob(web_url_info_t* url_info) {
         snprintf(url,2048,NEW_JOB_URL,Global_NewJobURL,url_info->IP_adress,url_info->job_id,url_info->job_uuid,encode_url_job_name,
                  url_info->job_state,encode_url_printer_name,url_info->paper_size,url_info->media_type,
                  url_info->copies,url_info->mopies,url_info->duplex,url_info->color_mode,url_info->file_num,
-                 url_info->filePath,url_info->pages_num);
+                 url_info->preViewFilePath,url_info->filePath,url_info->pages_num);
 
 
         strcat(http_request_message,"POST");
