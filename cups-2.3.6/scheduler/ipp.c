@@ -404,8 +404,13 @@ int send_job_to_webserver(cupsd_job_t *job,cupsd_client_t *con){
   attr = ippFindAttribute(job->attrs, "copies",IPP_TAG_INTEGER);
   if((attr != NULL) && (attr->values[0].integer != 0)){
     snprintf(copies,sizeof(copies),"%d",attr->values[0].integer);
+    //强制把copy数设置成1
+    attr->values[0].integer = 1;
   } else {
     snprintf(copies,sizeof(copies),"1");
+    //强制把copy数设置成1
+    ippAddInteger(job->attrs, IPP_TAG_JOB, IPP_TAG_INTEGER, "copies", 1);
+
   }
   
   fprintf(fp,"copies=%s \n",copies);
