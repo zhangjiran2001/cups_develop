@@ -225,7 +225,7 @@ static int getPDFPageNum(char* file_name){
  * output: void
  */
 void savePreviewFile(char* source_file_path, char* preview_file_path, char* source_file_name, char* preview_file_name){
-    ZHANG_LOG("savePreviewFile is called!\n");
+    CASIC_REQUEST_PRINT_LOG("savePreviewFile is called!\n");
     // 生成命令行字符串
     char command[1024];
     char first_line[1024];
@@ -251,11 +251,11 @@ void savePreviewFile(char* source_file_path, char* preview_file_path, char* sour
     snprintf(temp_file, sizeof(temp_file), "%s/%s.temp", preview_file_path, preview_file_name);
 
     if((s_fp=fopen(source_file,"r")) == NULL) {
-      ZHANG_LOG("source_file open file failed filename=%s", source_file);
+      CASIC_REQUEST_PRINT_LOG("source_file open file failed filename=%s", source_file);
       return;
     } else {
       if((p_fp=fopen(preview_file,"wb+"))==NULL){
-        ZHANG_LOG("preview_file open file failed preview_file=%s", preview_file);
+        CASIC_REQUEST_PRINT_LOG("preview_file open file failed preview_file=%s", preview_file);
         fclose(s_fp);
         s_fp = NULL;
         return;
@@ -275,7 +275,7 @@ void savePreviewFile(char* source_file_path, char* preview_file_path, char* sour
     // 打开预览文件
     FILE* file = fopen(preview_file, "r");
     if (file == NULL) {
-        ZHANG_LOG("Can't Open preview file %s\n",preview_file);
+        CASIC_REQUEST_PRINT_LOG("Can't Open preview file %s\n",preview_file);
         return;
     }
     
@@ -293,21 +293,21 @@ void savePreviewFile(char* source_file_path, char* preview_file_path, char* sour
         // 执行命令
         int result = system(command);
         if (result == -1) {
-          ZHANG_LOG("EXECUTE ghostscript Command %s Failed \n",command);
+          CASIC_REQUEST_PRINT_LOG("EXECUTE ghostscript Command %s Failed \n",command);
           return;
         }
 
         if (remove(preview_file) != 0) {
-          ZHANG_LOG("delete %s file failed!\n",preview_file);
+          CASIC_REQUEST_PRINT_LOG("delete %s file failed!\n",preview_file);
         }    
         if (rename(temp_file, preview_file) != 0) {
-          ZHANG_LOG("rename %s file failed!\n",temp_file);
+          CASIC_REQUEST_PRINT_LOG("rename %s file failed!\n",temp_file);
         }
     } else if (strstr(first_line, "PDF") != NULL) {
         // do nothing
         
     } else {
-        ZHANG_LOG("There is not exist EPSF OR PDF file\n");
+        CASIC_REQUEST_PRINT_LOG("There is not exist EPSF OR PDF file\n");
         return;
     }
 
@@ -503,7 +503,7 @@ int send_job_to_webserver(cupsd_job_t *job,cupsd_client_t *con){
 
   //获取客户端IP地址
   httpAddrString(httpGetAddress(con->http), ip_address, sizeof(ip_address));
-  ZHANG_LOG("Client IP address is :%s\n",ip_address);
+  CASIC_REQUEST_PRINT_LOG("Client IP address is :%s\n",ip_address);
 
   //打印中间spool文件夹的路径，利用中间文件处理PDF，EPS，加水印等等
   snprintf(file_path, sizeof(file_path), "%s", RequestRoot);
@@ -540,7 +540,7 @@ int send_job_to_webserver(cupsd_job_t *job,cupsd_client_t *con){
 
   }
 
-  ZHANG_LOG("notifyWebServerToCreatNewJob\n");
+  CASIC_REQUEST_PRINT_LOG("notifyWebServerToCreatNewJob\n");
 
   if(notifyWebServerToCreatNewJob(&url_info) == -1) {
     return 0;
@@ -566,7 +566,7 @@ cupsdProcessIPPRequest(
   int			sub_id;		/* Subscription ID */
   int			valid = 1;	/* Valid request? */
 
-  //ZHANG_LOG("cupsdProcessIPPRequest(%p[%d]): operation_id=%04x(%s)\n", con, con->number, con->request->request.op.operation_id, ippOpString(con->request->request.op.operation_id));
+  CASIC_CUPS_LOG("cupsdProcessIPPRequest(%p[%d]): operation_id=%04x(%s)\n", con, con->number, con->request->request.op.operation_id, ippOpString(con->request->request.op.operation_id));
   cupsdLogMessage(CUPSD_LOG_DEBUG2, "cupsdProcessIPPRequest(%p[%d]): operation_id=%04x(%s)", con, con->number, con->request->request.op.operation_id, ippOpString(con->request->request.op.operation_id));
   if (LogLevel >= CUPSD_LOG_DEBUG2)
   {
@@ -8864,8 +8864,8 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
 
   cupsdLogMessage(CUPSD_LOG_DEBUG2, "print_job(%p[%d], %s)", con, con->number,
                   uri->values[0].string.text);
-  //ZHANG_LOG("print_job(%p[%d], %s)\n", con, con->number,
-  //                uri->values[0].string.text);
+  CASIC_CUPS_LOG("print_job(%p[%d], %s)\n", con, con->number,
+                  uri->values[0].string.text);
  /*
   * Validate print file attributes, for now just document-format and
   * compression (CUPS only supports "none" and "gzip")...
@@ -8887,7 +8887,7 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
         	      attr->values[0].string.text);
       ippAddString(con->response, IPP_TAG_UNSUPPORTED_GROUP, IPP_TAG_KEYWORD,
 	           "compression", NULL, attr->values[0].string.text);
-      ZHANG_LOG("Unsupported compression \"%s\".\n",attr->values[0].string.text);
+      CASIC_CUPS_LOG("Unsupported compression \"%s\".\n",attr->values[0].string.text);
       return;
     }
 
@@ -8904,7 +8904,7 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
   if (!con->filename)
   {
     send_ipp_status(con, IPP_BAD_REQUEST, _("No file in print request."));
-    ZHANG_LOG("No file in print request.\n");
+    CASIC_CUPS_LOG("No file in print request.\n");
     return;
   }
 
@@ -8920,7 +8920,7 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
 
     send_ipp_status(con, IPP_NOT_FOUND,
                     _("The printer or class does not exist."));
-    ZHANG_LOG("The printer or class does not exist.\n");
+    CASIC_CUPS_LOG("The printer or class does not exist.\n");
     return;
   }
 
@@ -8945,7 +8945,7 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
       send_ipp_status(con, IPP_BAD_REQUEST,
                       _("Bad document-format \"%s\"."),
 		      format->values[0].string.text);
-      ZHANG_LOG("Bad document-format %s \n",format->values[0].string.text);
+      CASIC_CUPS_LOG("Bad document-format %s \n",format->values[0].string.text);
       return;
     }
 
@@ -8964,7 +8964,7 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
       send_ipp_status(con, IPP_BAD_REQUEST,
                       _("Bad document-format \"%s\"."),
 		      default_format);
-      ZHANG_LOG("Bad document-format %s \n",default_format);
+      CASIC_CUPS_LOG("Bad document-format %s \n",default_format);
       return;
     }
   }
@@ -9034,7 +9034,7 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
       ippAddString(con->response, IPP_TAG_UNSUPPORTED_GROUP, IPP_TAG_MIMETYPE,
                    "document-format", NULL, format->values[0].string.text);
 
-    ZHANG_LOG("Hint: Do you have the raw file printing rules enabled?\n");
+    CASIC_CUPS_LOG("Hint: Do you have the raw file printing rules enabled?\n");
     return;
   }
 
@@ -9052,7 +9052,7 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
   */
 
   if ((job = add_job(con, printer, filetype)) == NULL) {
-    ZHANG_LOG("Create the job object... failed\n");
+    CASIC_CUPS_LOG("Create the job object... failed\n");
     return;
   }
 
@@ -9077,7 +9077,7 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
   */
 
   if (add_file(con, job, filetype, compression)){
-    ZHANG_LOG("Add the job file... failed\n");
+    CASIC_CUPS_LOG("Add the job file... failed\n");
     return;
   }
 
@@ -9088,7 +9088,7 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
   if (rename(con->filename, filename))
   {
     cupsdLogJob(job, CUPSD_LOG_ERROR, "Unable to rename job document file \"%s\": %s", filename, strerror(errno));
-    ZHANG_LOG("Unable to rename job document file \"%s\": %s\n", filename, strerror(errno));
+    CASIC_CUPS_LOG("Unable to rename job document file \"%s\": %s\n", filename, strerror(errno));
     send_ipp_status(con, IPP_INTERNAL_ERROR, _("Unable to rename job document file."));
     return;
   }
@@ -9100,7 +9100,7 @@ print_job(cupsd_client_t  *con,		/* I - Client connection */
   */
 
   if (cupsdTimeoutJob(job)){
-    ZHANG_LOG("cupsdTimeoutJob failed\n");
+    CASIC_CUPS_LOG("cupsdTimeoutJob failed\n");
     return;
   }
 

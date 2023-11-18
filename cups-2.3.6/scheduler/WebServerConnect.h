@@ -28,7 +28,8 @@
 #define NEW_JOB_URL_KEY_WORD "URL_printSaveState" 
 #define CHANGE_JOB_STATE_URL_KEY_WORD "URL_stateChange" 
 #define RESPONSE_RESULT_KEY_WORD "response_result"  
-#define ID_CARD_KEY_WORD "ID_Card_Num"                      
+#define ID_CARD_KEY_WORD "ID_Card_Num"
+#define CASIC_LOG_PATH_KEY_WORD "CASIC_CUPS_Log_Path"                      
 
 
 #define NEW_JOB_URL "%s?PID=%s\
@@ -71,15 +72,22 @@ typedef struct web_url_info_s
 
 
 
-#define ZHANG_DEBUG_LOG  // 注释此行以禁用日志输出
+#define CASIC_DEBUG_LOG  // 注释此行以禁用日志输出
 
-#ifdef ZHANG_DEBUG_LOG
+#ifdef CASIC_DEBUG_LOG
 // 定义日志宏，可以接收可变数量的参数
-#define ZHANG_LOG(format, ...) writeLocalDebugLog(__FILE__, __LINE__, format, ##__VA_ARGS__)
+#define CASIC_CUPS_LOG(format, ...) writeCupsDebugLog(__FILE__, __LINE__, format, ##__VA_ARGS__)
+#define CASIC_REQUEST_PRINT_LOG(format, ...) writeRequestPrintDebugLog(__FILE__, __LINE__, format, ##__VA_ARGS__)
+#define CASIC_EXECUTE_PRINT_LOG(format, ...) writeExecutePrintDebugLog(__FILE__, __LINE__, format, ##__VA_ARGS__)
 #else
-#define ZHANG_LOG(format, ...) ((void)0)
+#define CASIC_CUPS_LOG(format, ...) ((void)0)
+#define CASIC_REQUEST_PRINT_LOG(format, ...) ((void)0)
+#define CASIC_EXECUTE_PRINT_LOG(format, ...) ((void)0)
 #endif
-void writeLocalDebugLog(const char* filename, int line, const char* format, ...);
+void writeCupsDebugLog(const char* filename, int line, const char* format, ...);
+void writeRequestPrintDebugLog(const char* filename, int line, const char* format, ...);
+void writeExecutePrintDebugLog(const char* filename, int line, const char* format, ...);
+
 /*FUNCTION      :creat a socket and connect to the WebServer to notify there is a new job  */
 /*INPUT         :web_url_info_t* url_info                                                  */
 /*OUTPUT        :int  --- >=1: success ; -1: failed                                        */
