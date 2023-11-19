@@ -13,12 +13,7 @@ int webServerURLencode(char *source_str, int source_str_len, char *target_str,in
 	end = (unsigned char *)source_str + source_str_len;
 	start = to = (unsigned char *)target_str;
         if(target_str_length < (3*source_str_len)){
-                return 0;
-        }
-
-        FILE * debug_log_fp;
-        debug_log_fp = fopen(ERROR_INFO_FILE_PATH,"at+");
-        if(debug_log_fp == NULL){
+                CASIC_CUPS_LOG("webServerURLencode is not successful run!");
                 return 0;
         }
 
@@ -43,9 +38,6 @@ int webServerURLencode(char *source_str, int source_str_len, char *target_str,in
 	}
 	*to = '\0';
         target_str_length = strlen(target_str);
-        fprintf(debug_log_fp,"target_str= %s\n target_str_length=%d\n",target_str,target_str_length);
-	fflush(debug_log_fp);
-        fclose(debug_log_fp);
 
 	return 1;
 
@@ -229,16 +221,10 @@ int webServerGetWebInfoFormConfigFile() {
 int notifyWebServerToCreatNewJob(web_url_info_t* url_info) {
         struct sockaddr_in servaddr;
         int sockfd = 0;
-        FILE * fp = NULL;
         int ret = 0;
         char host_string[32];
         memset(host_string,0,32);
         int web_server_port = 0;
-
-        char time_string[32];
-        memset(time_string,0,32);
-        time_t now;
-        struct tm *tm_now;
 
         if(url_info == NULL) {
                 return -1;
@@ -247,18 +233,6 @@ int notifyWebServerToCreatNewJob(web_url_info_t* url_info) {
         if(webServerGetWebInfoFormConfigFile() == 0){
                 return -1;
         }
-
-        fp = fopen(ERROR_INFO_FILE_PATH,"at+");
-        if(fp == NULL){
-                return -1;
-        }
-
-        //get current time
-        time(&now);
-        tm_now = localtime(&now);
-        snprintf(time_string, sizeof(time_string), 
-                "[%4d-%02d-%02d %02d:%02d:%02d]",
-                tm_now->tm_year+1900,tm_now->tm_mon+1,tm_now->tm_mday,tm_now->tm_hour,tm_now->tm_min,tm_now->tm_sec);
 
 
         //request message buffer
@@ -283,8 +257,7 @@ int notifyWebServerToCreatNewJob(web_url_info_t* url_info) {
 
         //creat a new socket        
         if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0 ) {
-                fprintf(fp,"%s notifyWebServerToCreatNewJob: web socket creat failed!\n",time_string);
-		fclose(fp);
+                CASIC_REQUEST_PRINT_LOG("notifyWebServerToCreatNewJob: web socket creat failed!");
                 return -1;
         }
         
@@ -296,8 +269,7 @@ int notifyWebServerToCreatNewJob(web_url_info_t* url_info) {
 
         //exchange IP Address
         if (inet_pton(AF_INET, Global_ServerIP, &servaddr.sin_addr) <= 0 ){
-                fprintf(fp,"%s notifyWebServerToCreatNewJob: inet_pton IP Address error!\n",time_string);
-		fclose(fp);
+                CASIC_REQUEST_PRINT_LOG("notifyWebServerToCreatNewJob: inet_pton IP Address error!");
                 close(sockfd);
                 return -1;
         }
@@ -308,36 +280,31 @@ int notifyWebServerToCreatNewJob(web_url_info_t* url_info) {
         timeout.tv_usec = 0;
 
         if(setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0) {
-                fprintf(fp,"%s notifyWebServerToCreatNewJob() setsockopt SO_SNDTIMEO error!\n",time_string);
-                fflush(fp);
+                CASIC_REQUEST_PRINT_LOG("notifyWebServerToCreatNewJob() setsockopt SO_SNDTIMEO error!");
                 close(sockfd);
                 return -1;
         }
 
         if(setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
-                fprintf(fp,"%s notifyWebServerToCreatNewJob() setsockopt SO_RCVTIMEO error!\n",time_string);
-                fflush(fp);
+                CASIC_REQUEST_PRINT_LOG("notifyWebServerToCreatNewJob() setsockopt SO_RCVTIMEO error!");
                 close(sockfd);
                 return -1;
         }
 
         //connect to web server
         if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0){
-                fprintf(fp,"%s notifyWebServerToCreatNewJob: connect error! errornum=%d\n",time_string,errno);
-		fclose(fp);
+                CASIC_REQUEST_PRINT_LOG("notifyWebServerToCreatNewJob: connect error! errornum=%d",errno);
                 close(sockfd);
                 return -1;
         }
         
         if(webServerURLencode(url_info->job_name,strlen(url_info->job_name),encode_url_job_name,sizeof(encode_url_job_name)) == 0){
-                fprintf(fp,"%s webServerURLencode job name error!\n",time_string);
-		fclose(fp);
+                CASIC_REQUEST_PRINT_LOG("webServerURLencode job name error!");
                 close(sockfd);
                 return -1;
         }
         if(webServerURLencode(url_info->printer_name,strlen(url_info->printer_name),encode_url_printer_name,sizeof(encode_url_printer_name)) == 0){
-                fprintf(fp,"%s webServerURLencode printer_name error!\n",time_string);
-		fclose(fp);
+                CASIC_REQUEST_PRINT_LOG("webServerURLencode printer_name error!");
                 close(sockfd);
                 return -1;
         }
@@ -363,52 +330,41 @@ int notifyWebServerToCreatNewJob(web_url_info_t* url_info) {
                 
         ret = write(sockfd,http_request_message,strlen(http_request_message));
         if (ret < 0) {
-                
-                fprintf(fp,"%s notifyWebServerToCreatNewJob: message send error! error num is %d error message is '%s'\n",
-                                time_string,errno, strerror(errno));
-                fclose(fp);
+                CASIC_REQUEST_PRINT_LOG("notifyWebServerToCreatNewJob: message send error! error num is %d error message is '%s'",errno,strerror(errno));
                 close(sockfd);
                 return -1;
                 
         }
 
-        fprintf(fp,"%s notifyWebServerToCreatNewJob: http_send_message=%s\n",
-                                time_string,http_request_message);
-        fflush(fp);       
+        CASIC_REQUEST_PRINT_LOG("notifyWebServerToCreatNewJob: http_send_message=%s",http_request_message);      
         //message send complete! 
         memset(http_receive_message, 0, sizeof(http_receive_message));
         ret = read(sockfd,http_receive_message,sizeof(http_receive_message)-1);
         if (ret < 0) {
                 
-                fprintf(fp,"%s notifyWebServerToCreatNewJob: message receive error! error num is %d error message is '%s'\n",
-                                time_string,errno, strerror(errno));
-                fclose(fp);
+                CASIC_REQUEST_PRINT_LOG("notifyWebServerToCreatNewJob: message receive error! error num is %d error message is '%s'",
+                                errno, strerror(errno));
                 close(sockfd);
                 return -1;
                 
         }
-        fprintf(fp,"%s notifyWebServerToCreatNewJob: http_receive_message=%s\n",
-                                time_string,http_receive_message);
-        fflush(fp);
+        CASIC_REQUEST_PRINT_LOG("notifyWebServerToCreatNewJob: http_receive_message=%s",http_receive_message);
 
         ret = webServerGetValueFromJosn(http_receive_message,RESPONSE_RESULT_KEY_WORD,response_buf,sizeof(response_buf));
         if(ret == 0){
 
-                fprintf(fp,"%s notifyWebServerToCreatNewJob: http_receive_message prase failed\n",time_string);
-                fclose(fp);
+                CASIC_REQUEST_PRINT_LOG("notifyWebServerToCreatNewJob: http_receive_message prase failed");
                 close(sockfd);
                 return -1;
 
         }
 
         if(strcmp(response_buf,"OK") != 0){
-                fprintf(fp,"%s notifyWebServerToCreatNewJob: response failed response msg=%s\n",time_string,response_buf);
-                fclose(fp);
+                CASIC_REQUEST_PRINT_LOG("notifyWebServerToCreatNewJob: response failed response msg=%s",response_buf);
                 close(sockfd);
                 return -1;
         }
 
-	fclose(fp);
         close(sockfd);
         return 1;
 
@@ -423,33 +379,14 @@ int notifyWebServerToCreatNewJob(web_url_info_t* url_info) {
 int notifyWebServerToChangeJobState(int job_id,char* job_uuid,char* job_state) {
         struct sockaddr_in servaddr;
         int sockfd = 0;
-        FILE * fp = NULL;
         int ret = 0;
         char host_string[32];
         memset(host_string,0,32);
-        int web_server_port = 0;
-
-        char time_string[32];
-        memset(time_string,0,32);
-        time_t now;
-        struct tm *tm_now;
-        
+        int web_server_port = 0;      
 
         if(webServerGetWebInfoFormConfigFile() == 0){
                 return -1;
         }
-        fp = fopen(ERROR_INFO_FILE_PATH,"at+");
-        if(fp == NULL){
-                return -1;
-        }
-
-        //get current time
-        time(&now);
-        tm_now = localtime(&now);
-        snprintf(time_string, sizeof(time_string), 
-                "[%4d-%02d-%02d %02d:%02d:%02d]",
-                tm_now->tm_year+1900,tm_now->tm_mon+1,tm_now->tm_mday,tm_now->tm_hour,tm_now->tm_min,tm_now->tm_sec);
-
 
         //request message buffer
         char http_request_message[HTTP_MESSAGE_BUFSIZE];
@@ -462,8 +399,7 @@ int notifyWebServerToChangeJobState(int job_id,char* job_uuid,char* job_state) {
 
         //creat a new socket        
         if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0 ) {
-                fprintf(fp,"%s notifyWebServerToChangeJobState: web socket creat failed!\n",time_string);
-		fclose(fp);
+                CASIC_EXECUTE_PRINT_LOG("notifyWebServerToChangeJobState: web socket creat failed!");
                 return -1;
         }
         
@@ -475,8 +411,7 @@ int notifyWebServerToChangeJobState(int job_id,char* job_uuid,char* job_state) {
 
         //exchange IP Address
         if (inet_pton(AF_INET, Global_ServerIP, &servaddr.sin_addr) <= 0 ){
-                fprintf(fp,"%s notifyWebServerToChangeJobState: inet_pton IP Address error!\n",time_string);
-		fclose(fp);
+                CASIC_EXECUTE_PRINT_LOG("notifyWebServerToChangeJobState: inet_pton IP Address error!");
                 close(sockfd);
                 return -1;
         }
@@ -487,16 +422,14 @@ int notifyWebServerToChangeJobState(int job_id,char* job_uuid,char* job_state) {
         timeout.tv_usec = 0;
 
         if(setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0) {
-                fprintf(fp,"%s notifyWebServerToChangeJobState() setsockopt SO_SNDTIMEO error!\n",time_string);
-                fflush(fp);
+                CASIC_EXECUTE_PRINT_LOG("%s notifyWebServerToChangeJobState() setsockopt SO_SNDTIMEO error!\n");
                 close(sockfd);
                 return -1;
         }
 
         //connect to web server
         if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0){
-                fprintf(fp,"%s notifyWebServerToChangeJobState: connect error!\n",time_string);
-		fclose(fp);
+                CASIC_EXECUTE_PRINT_LOG("notifyWebServerToChangeJobState: connect error!");
                 close(sockfd);
                 return -1;
         }
@@ -519,17 +452,25 @@ int notifyWebServerToChangeJobState(int job_id,char* job_uuid,char* job_state) {
         ret = write(sockfd,http_request_message,strlen(http_request_message));
         if (ret < 0) {
                 
-                fprintf(fp,"%s notifyWebServerToChangeJobState: message send error! error num is %d error message is '%s'\n",
-                                time_string,errno, strerror(errno));
-                fclose(fp);
+                CASIC_EXECUTE_PRINT_LOG("notifyWebServerToChangeJobState: message send error! error num is %d error message is '%s'",
+                                errno, strerror(errno));
                 close(sockfd);
                 return -1;
                 
         } else{
-                //message send complete! 
+                //message send complete!
+                
+                if(strcmp(job_state,"Cancel") == 0) {
+                   CASIC_REQUEST_PRINT_LOG("notifyWebServerToChangeJobState: job is canceled, message = %s",http_request_message);      
+                } else if(strcmp(job_state,"Abort") == 0){
+                   CASIC_EXECUTE_PRINT_LOG("notifyWebServerToChangeJobState: job is Aborted, message = %s",http_request_message);
+                } else if(strcmp(job_state,"Complete") == 0){
+                   CASIC_EXECUTE_PRINT_LOG("notifyWebServerToChangeJobState: job is Completed, message = %s",http_request_message);
+                } else{
+                   CASIC_EXECUTE_PRINT_LOG("notifyWebServerToChangeJobState: message send OK, message = %s",http_request_message); 
+                }
         }
 
-	fclose(fp);
         close(sockfd);
         return 1;
 
@@ -577,7 +518,7 @@ void writeCupsDebugLog(const char* filename, int line, const char* format, ...)
     
 
     // 格式化字符串并写入文件
-    fprintf(file, "[%s][CUPS][%s:%d] ", time_string, filename, line);
+    fprintf(file, "%s[CUPS][%s:%d] ", time_string, filename, line);
     vfprintf(file, format, args);
     fprintf(file, "\n");
 
@@ -628,7 +569,7 @@ void writeRequestPrintDebugLog(const char* filename, int line, const char* forma
     
 
     // 格式化字符串并写入文件
-    fprintf(file, "[%s][REQPRINT][%s:%d] ", time_string, filename, line);
+    fprintf(file, "%s[REQPRINT][%s:%d] ", time_string, filename, line);
     vfprintf(file, format, args);
     fprintf(file, "\n");
 
@@ -679,7 +620,7 @@ void writeExecutePrintDebugLog(const char* filename, int line, const char* forma
     
 
     // 格式化字符串并写入文件
-    fprintf(file, "[%s][EXEPRINT][%s:%d] ", time_string, filename, line);
+    fprintf(file, "%s[EXEPRINT][%s:%d] ", time_string, filename, line);
     vfprintf(file, format, args);
     fprintf(file, "\n");
 

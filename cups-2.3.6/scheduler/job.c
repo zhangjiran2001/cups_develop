@@ -131,7 +131,7 @@ static void	load_next_job_id(const char *filename);
 static void	load_request_root(void);
 
 /*add by printJugeSystem for save spool file*/
-static void reserve_job_files(cupsd_job_t *job);
+//static void reserve_job_files(cupsd_job_t *job);
 
 static void	remove_job_files(cupsd_job_t *job);
 static void	remove_job_history(cupsd_job_t *job);
@@ -2757,8 +2757,7 @@ cupsdSetJobState(
 
   /**************add by printJugeSystem for save spool file *********/
   if (newstate == IPP_JOB_COMPLETED){
-    cupsdLogMessage(CUPSD_LOG_DEBUG,"JOB END filename=%s/d%05d-001", RequestRoot,job->id);
-    reserve_job_files(job);
+  //  reserve_job_files(job);
   }
   /**************add by printJugeSystem for save spool file end*********/
 
@@ -4700,6 +4699,7 @@ load_request_root(void)
   cupsDirClose(dir);
 }
 
+#if 0
 /*
  * 'reserve_job_files()' - Reserve the document files for a job.
  * add by printJugeSystem for save spool file
@@ -4719,7 +4719,7 @@ reserve_job_files(cupsd_job_t *job)     /* I - Job */
   struct tm *tm_now;
 
 
-  cupsdLogMessage(CUPSD_LOG_DEBUG,"reserve_job_files is called job=%p!!!",job);
+  //CASIC_EXECUTE_PRINT_LOG("reserve_job_files is called job=%p!!!",job);
   if (job->num_files <= 0)
     return;
   time(&now);
@@ -4733,10 +4733,10 @@ reserve_job_files(cupsd_job_t *job)     /* I - Job */
         tm_now->tm_year+1900,tm_now->tm_mon+1,tm_now->tm_mday,tm_now->tm_hour,tm_now->tm_min,tm_now->tm_sec);
 
     if((fp=fopen(filename,"r")) == NULL){
-      cupsdLogMessage(CUPSD_LOG_DEBUG,"reserve_job_files open file failed filename=%s", filename);
+      //CASIC_EXECUTE_PRINT_LOG("reserve_job_files open file failed filename=%s", filename);
     } else {
       if((reserve_fp=fopen(reserve_filename,"wb+"))==NULL){
-        cupsdLogMessage(CUPSD_LOG_DEBUG,"reserve_job_files open file failed reserve_filename=%s", reserve_filename);
+        //CASIC_EXECUTE_PRINT_LOG("reserve_job_files open file failed reserve_filename=%s", reserve_filename);
       }else{
         while(!feof(fp)){
           count = fread(buffer,sizeof(char),sizeof(buffer),fp);
@@ -4751,7 +4751,7 @@ reserve_job_files(cupsd_job_t *job)     /* I - Job */
 
 }
 
-
+#endif
 
 /*
  * 'remove_job_files()' - Remove the document files for a job.

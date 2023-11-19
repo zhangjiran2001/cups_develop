@@ -141,7 +141,6 @@ static int	validate_user(cupsd_job_t *job, cupsd_client_t *con, const char *owne
 static int getPDFPageNum(char* file_name){
     
     FILE *fstream=NULL;
-    FILE * fp = NULL; 
     char command_buff[512];
     memset(command_buff,0,sizeof(command_buff));
     char receive_buff[512];
@@ -150,35 +149,27 @@ static int getPDFPageNum(char* file_name){
     char* key_mark = NULL;
     int pages_num = 0;
 
-    fp = fopen(ERROR_INFO_FILE_PATH,"at+");
-    if(fp == NULL)return pages_num;
 
     fstream = popen(command_buff,"r");
     if(fstream == NULL)
     {
-        fprintf(fp,"ZHANGJIRAN execute command failed: %s\n",strerror(errno));
-        fclose(fp);
+        CASIC_REQUEST_PRINT_LOG("execute pdfinfo command failed: %s",strerror(errno));
         return pages_num;
     }
 
     while(!feof(fstream)){
       if(fgets(receive_buff, sizeof(receive_buff), fstream) != NULL) {
 
-        fprintf(fp,"ZHANGJIRAN execute command is: %s\n",receive_buff);
-        fflush(fp);
         key_mark = strstr(receive_buff,"Pages:");
         if(key_mark == NULL){
           continue;
         } else{
           sscanf((key_mark+strlen("Pages:")),"%d",&pages_num);
-          fprintf(fp,"ZHANGJIRAN pages_num =%d\n",pages_num);
-          fflush(fp);
           break;
         }
       }
     }
 
-    fclose(fp);
     pclose(fstream);
     
     if(pages_num == 0) {
@@ -186,31 +177,29 @@ static int getPDFPageNum(char* file_name){
       memset(receive_buff,0,sizeof(receive_buff));
       snprintf(command_buff,sizeof(command_buff),"grep -c %%Page %s",file_name);
 
-      fp = fopen(ERROR_INFO_FILE_PATH,"at+");
-      if(fp == NULL)return pages_num;
-
       fstream = popen(command_buff,"r");
       if(fstream == NULL)
       {
-        fprintf(fp,"ZHANGJIRAN execute command failed: %s\n",strerror(errno));
-        fclose(fp);
+        CASIC_REQUEST_PRINT_LOG("execute grep command failed: %s",strerror(errno));
         return pages_num;
       }
 
       fgets(receive_buff, sizeof(receive_buff), fstream);
       // 关闭文件指针
-      fclose(fp);
       pclose(fstream);
 
-    // 将输出结果转换为整数并打印
-    pages_num = atoi(receive_buff)-2;
-    if(pages_num >0) {
-      return pages_num;
-    } else {
-      return 0;
-    }
+      // 将输出结果转换为整数并打印
+      pages_num = atoi(receive_buff)-2;
+      if(pages_num >0) {
+        CASIC_REQUEST_PRINT_LOG("execute grep get PageNum =%d",pages_num);
+        return pages_num;
+      } else {
+        CASIC_REQUEST_PRINT_LOG("execute any command can't get PageNum!");
+        return 0;
+      }
     
   } else {
+    CASIC_REQUEST_PRINT_LOG("execute pdfinfo get PageNum =%d",pages_num);
     return pages_num;
   }
 
@@ -225,7 +214,7 @@ static int getPDFPageNum(char* file_name){
  * output: void
  */
 void savePreviewFile(char* source_file_path, char* preview_file_path, char* source_file_name, char* preview_file_name){
-    CASIC_REQUEST_PRINT_LOG("savePreviewFile is called!\n");
+    CASIC_REQUEST_PRINT_LOG("savePreviewFile is called!");
     // 生成命令行字符串
     char command[1024];
     char first_line[1024];
@@ -320,7 +309,6 @@ void savePreviewFile(char* source_file_path, char* preview_file_path, char* sour
 int send_job_to_webserver(cupsd_job_t *job,cupsd_client_t *con){
 
 
-  FILE * fp = NULL; 
   int i = 0; 
   int exact = 0;
   ipp_attribute_t	*attr = NULL;		/* Current attribute */
@@ -351,123 +339,124 @@ int send_job_to_webserver(cupsd_job_t *job,cupsd_client_t *con){
   char* color_mode = NULL;
   char* job_name = NULL;
 
-  char time_string[32];
-  memset(time_string,0,32);
-  time_t now;
-  struct tm *tm_now;
+ CASIC_REQUEST_PRINT_LOG("send_job_to_webserver is called! cupsd_job_t=%p,cupsd_client_t=%p",job,con);
 
   if(job == NULL) return 0;
 
   printer = cupsdFindDest(job->dest);
+  CASIC_REQUEST_PRINT_LOG("send_job_to_webserver printer=%p",printer);
   if(printer == NULL) return 0;
 
-  //get current time
-  time(&now);
-  tm_now = localtime(&now);
-  snprintf(time_string, sizeof(time_string), 
-     "[%4d-%02d-%02d %02d:%02d:%02d]",
-     tm_now->tm_year+1900,tm_now->tm_mon+1,tm_now->tm_mday,tm_now->tm_hour,tm_now->tm_min,tm_now->tm_sec);
-
-  fp = fopen(ERROR_INFO_FILE_PATH,"at+");
   attr = ippFindAttribute(job->attrs,"job-name",IPP_TAG_NAME);
   if(attr != NULL){
     job_name = attr->values[0].string.text;
     while(strchr(job_name,'/')){
       job_name = strchr(job_name,'/') + 1;
     }
+    CASIC_REQUEST_PRINT_LOG("send_job_to_webserver get ippAttr job-name=%s",job_name);
   } else {
     job_name = NULL;
+    CASIC_REQUEST_PRINT_LOG("send_job_to_webserver can't get ippAttr job-name,job-name=%s",job_name);
   }
-  fprintf(fp,"%s job-name=%s \n",time_string,job_name);
-  fflush(fp);
-
-  snprintf(paper_size,sizeof(paper_size),"%s", _ppdCacheGetPageSize(printer->pc, job->attrs, NULL, &exact));
-  if(strncmp(paper_size,"(null)",6) == 0 ){
-    snprintf(paper_size,sizeof(paper_size),"A4");
+  
+  attr = ippFindAttribute(job->attrs, "PageSize", IPP_TAG_ZERO);
+  if(attr != NULL){
+    snprintf(paper_size,sizeof(paper_size),"%s", attr->values[0].string.text);
+    CASIC_REQUEST_PRINT_LOG("send_job_to_webserver get ippAttr PageSize=%s",paper_size);
+  } else {
+    CASIC_REQUEST_PRINT_LOG("send_job_to_webserver can't get ippAttr PageSize");
+    snprintf(paper_size,sizeof(paper_size),"%s", _ppdCacheGetPageSize(printer->pc, job->attrs, NULL, &exact));
+    if(strncmp(paper_size,"(null)",6) == 0 ){
+      snprintf(paper_size,sizeof(paper_size),"A4");
+      CASIC_REQUEST_PRINT_LOG("send_job_to_webserver can't get papeSize from _ppdCacheGetPageSize, so Force set it to A4");
+    } else {
+      CASIC_REQUEST_PRINT_LOG("send_job_to_webserver get papeSize from _ppdCacheGetPageSize PageSize=%s strlen PageSize=%ld",paper_size,strlen(paper_size));
+    }
   }
-
-  fprintf(fp,"PageSize=%s strlen PageSize=%ld\n",paper_size,strlen(paper_size));
-  fflush(fp);
 
   snprintf(printer_location,sizeof(printer_location),"%s",printer->location);
-  fprintf(fp,"printer_location=%s\n",printer_location);
-  fflush(fp);
+  CASIC_REQUEST_PRINT_LOG("send_job_to_webserver printer_location=%s",printer_location);
 
   attr = ippFindAttribute(job->attrs, "MediaType", IPP_TAG_ZERO);
   if(attr != NULL){
     snprintf(media_type,sizeof(media_type),"%s", attr->values[0].string.text);
-  } 
+    CASIC_REQUEST_PRINT_LOG("send_job_to_webserver get ippAttr MediaType=%s strlen media_type=%ld",media_type,strlen(media_type));
+  } else {
+    CASIC_REQUEST_PRINT_LOG("send_job_to_webserver can't get ippAttr MediaType,MediaType=%s",media_type);
+  }
 
-  fprintf(fp,"media_type=%s strlen media_type=%ld\n",media_type,strlen(media_type));
-  fflush(fp); 
-
+  
   attr = ippFindAttribute(job->attrs, "copies",IPP_TAG_INTEGER);
   if((attr != NULL) && (attr->values[0].integer != 0)){
     snprintf(copies,sizeof(copies),"%d",attr->values[0].integer);
     //强制把copy数设置成1
     attr->values[0].integer = 1;
+    CASIC_REQUEST_PRINT_LOG("send_job_to_webserver get ippAttr copies =%s",copies);
+    CASIC_REQUEST_PRINT_LOG("send_job_to_webserver Force set ippAttr copies=1");
   } else {
     snprintf(copies,sizeof(copies),"1");
     //强制把copy数设置成1
     ippAddInteger(job->attrs, IPP_TAG_JOB, IPP_TAG_INTEGER, "copies", 1);
+    CASIC_REQUEST_PRINT_LOG("send_job_to_webserver can't get ippAttr copies,so AddInteger ippAttr copies=1");
 
   }
-  
-  fprintf(fp,"copies=%s \n",copies);
-  fflush(fp);
 
   attr = ippFindAttribute(job->attrs, "Collate",IPP_TAG_BOOLEAN);
   if((attr != NULL)&&(attr->values[0].boolean)) {
     snprintf(mopies,sizeof(mopies),"True");
+    CASIC_REQUEST_PRINT_LOG("send_job_to_webserver get ippAttr Collate =%s",mopies);
   } else {
     snprintf(mopies,sizeof(mopies),"False");
+    CASIC_REQUEST_PRINT_LOG("send_job_to_webserver can't get ippAttr Collate,so set mopies=%s",mopies);
   }
-  fprintf(fp,"Collate=%s \n",mopies);
-  fflush(fp);
 
   attr = ippFindAttribute(job->attrs, "Duplex", IPP_TAG_NAME);
   if(attr != NULL){
     duplex = attr->values[0].string.text;
-    fprintf(fp,"Duplex =%s \n",duplex);
-    fflush(fp);
+    CASIC_REQUEST_PRINT_LOG("send_job_to_webserver get ippAttr Duplex =%s \n",duplex);
+  } else {
+    CASIC_REQUEST_PRINT_LOG("send_job_to_webserver can't get ippAttr Duplex,Duplex=%s",duplex);
   }
 
   attr = ippFindAttribute(job->attrs, "job-uuid", IPP_TAG_URI);
   if(attr != NULL){
-  job_uuid = attr->values[0].string.text;
+    job_uuid = attr->values[0].string.text;
+    CASIC_REQUEST_PRINT_LOG("send_job_to_webserver get ippAttr job_uuid=%s",job_uuid);
+  } else {
+    CASIC_REQUEST_PRINT_LOG("send_job_to_webserver can't get ippAttr job_uuid,job_uuid=%s",job_uuid);
   }
-  fprintf(fp,"job_uuid=%s\n",job_uuid);
-  fflush(fp);
+  
 
   attr = ippFindAttribute(job->attrs, "ColorModel", IPP_TAG_NAME);
   if(attr != NULL){
     color_mode = attr->values[0].string.text;
+    CASIC_REQUEST_PRINT_LOG("send_job_to_webserver get ippAttr ColorModel=%s",color_mode);
+  } else {
+    CASIC_REQUEST_PRINT_LOG("send_job_to_webserver can't get ippAttr ColorModel,ColorModel=%s",color_mode);
   }
-  fprintf(fp,"color_mode=%s \n",color_mode);
-  fflush(fp);
 
   //loop job attr begin
   #if 0
   for (attr = job->attrs->attrs; attr != NULL; attr = attr->next){
-    fprintf(fp,"job attr name = %s  group_tag:%d value_tag:%d num_values:%d \n",
+    CASIC_REQUEST_PRINT_LOG("job attr name = %s  group_tag:%d value_tag:%d num_values:%d",
                              attr->name,attr->group_tag,attr->value_tag,attr->num_values);
-    fflush(fp);
+
     switch(attr->value_tag) {
         case IPP_TAG_BOOLEAN:
-            fprintf(fp,"bool value=%d \n",attr->values[0].boolean);
-            fflush(fp);        
+            CASIC_REQUEST_PRINT_LOG("bool value=%d",attr->values[0].boolean);
+      
         break;
         case IPP_TAG_INTEGER:
         case IPP_TAG_ENUM:
-            fprintf(fp,"integer value=%d \n",attr->values[0].integer);
-            fflush(fp);
+            CASIC_REQUEST_PRINT_LOG("integer value=%d",attr->values[0].integer);
+
           break;
         case IPP_TAG_STRING:
 
             i = 0;
             int len;
-            fprintf(fp,"oct string=%s \n",(char *)ippGetOctetString(attr, i, &len));
-            fflush(fp);
+            CASIC_REQUEST_PRINT_LOG("oct string=%s",(char *)ippGetOctetString(attr, i, &len));
+
           break;
         case IPP_TAG_TEXT:
         case IPP_TAG_NAME :
@@ -478,8 +467,8 @@ int send_job_to_webserver(cupsd_job_t *job,cupsd_client_t *con){
         case IPP_TAG_CHARSET :
         case IPP_TAG_LANGUAGE :
         case IPP_TAG_MIMETYPE :
-            fprintf(fp,"text value=%s \n",attr->values[0].string.text);
-            fflush(fp);
+            CASIC_REQUEST_PRINT_LOG("text value=%s",attr->values[0].string.text);
+
           break;
         case IPP_TAG_UNSUPPORTED_VALUE :
 	      case IPP_TAG_DEFAULT :
@@ -488,8 +477,7 @@ int send_job_to_webserver(cupsd_job_t *job,cupsd_client_t *con){
 	      case IPP_TAG_NOTSETTABLE :
 	      case IPP_TAG_DELETEATTR :
 	      case IPP_TAG_ADMINDEFINE :
-            fprintf(fp,"have no value \n");
-            fflush(fp);
+            CASIC_REQUEST_PRINT_LOG("have no value ");
             break;
           default:
           break;
@@ -499,16 +487,16 @@ int send_job_to_webserver(cupsd_job_t *job,cupsd_client_t *con){
   #endif
   //loop job attr end
 
-  fclose(fp);
-
   //获取客户端IP地址
   httpAddrString(httpGetAddress(con->http), ip_address, sizeof(ip_address));
-  CASIC_REQUEST_PRINT_LOG("Client IP address is :%s\n",ip_address);
+  CASIC_REQUEST_PRINT_LOG("send_job_to_webserver Client IP address is :%s",ip_address);
 
   //打印中间spool文件夹的路径，利用中间文件处理PDF，EPS，加水印等等
   snprintf(file_path, sizeof(file_path), "%s", RequestRoot);
+  CASIC_REQUEST_PRINT_LOG("send_job_to_webserver spool file path is %s",file_path);
   //预览文件所在路径，用来给网页提供PDF预览文件
   snprintf(preview_file_path, sizeof(preview_file_path), "/opt/casic208/cups");
+  CASIC_REQUEST_PRINT_LOG("send_job_to_webserver preview file path is %s",preview_file_path);
 
   web_url_info_t url_info;
   url_info.user_name = job->username;
@@ -536,11 +524,12 @@ int send_job_to_webserver(cupsd_job_t *job,cupsd_client_t *con){
 
     memset(temp_filename,0,sizeof(temp_filename));
     snprintf(temp_filename, sizeof(temp_filename), "d%05d-%03d", job->id, (i+1));
+    CASIC_REQUEST_PRINT_LOG("savePreviewFile ,jobid=%d",job->id);
     savePreviewFile(url_info.filePath,url_info.preViewFilePath,temp_filename,temp_filename);
 
   }
 
-  CASIC_REQUEST_PRINT_LOG("notifyWebServerToCreatNewJob\n");
+  CASIC_REQUEST_PRINT_LOG("send_job_to_webserver notifyWebServerToCreatNewJob");
 
   if(notifyWebServerToCreatNewJob(&url_info) == -1) {
     return 0;
@@ -1567,6 +1556,7 @@ add_file(cupsd_client_t *con,		/* I - Connection to client */
         	  "add_file(con=%p[%d], job=%d, filetype=%s/%s, "
 		  "compression=%d)", con, con ? con->number : -1, job->id,
 		  filetype->super, filetype->type, compression);
+  CASIC_CUPS_LOG("add_file(con=%p[%d], job=%d, filetype=%s/%s, ""compression=%d)", con, con ? con->number : -1, job->id,filetype->super, filetype->type, compression);
 
  /*
   * Add the file to the job...
@@ -1672,7 +1662,10 @@ add_job(cupsd_client_t  *con,		/* I - Client connection */
                   con, con->number, printer, printer->name,
 		  filetype, filetype ? filetype->super : "none",
 		  filetype ? filetype->type : "none");
-
+  CASIC_CUPS_LOG("add_job(%p[%d], %p(%s), %p(%s/%s))",
+                  con, con->number, printer, printer->name,
+		  filetype, filetype ? filetype->super : "none",
+		  filetype ? filetype->type : "none");
  /*
   * Check remote printing to non-shared printer...
   */
@@ -10062,6 +10055,8 @@ send_document(cupsd_client_t  *con,	/* I - Client connection */
 
 
   cupsdLogMessage(CUPSD_LOG_DEBUG, "send_document(%p[%d], %s)", con,
+                  con->number, uri->values[0].string.text);
+  CASIC_CUPS_LOG("send_document(%p[%d], %s)", con,
                   con->number, uri->values[0].string.text);
 
  /*

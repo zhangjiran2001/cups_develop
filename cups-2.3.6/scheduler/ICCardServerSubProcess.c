@@ -45,6 +45,7 @@ typedef struct searchJobInfo
 #define WEB_SERVER_IP_KEY_WORD "web_server_ip"
 #define WEB_SERVER_PORT_KEY_WORD "web_server_port"
 #define SEARCH_JOB_URL_KEY_WORD "URL_getPrint"
+#define LOG_PATH_KEY_WORD "CASIC_CUPS_Log_Path" 
 #define SEARCH_JOB_URL "%s?iccard_reader_id=%ld&iccard_user_id=%ld"  //web server 's URL,the length limit is 2048 Byte
 #define HTTP_MESSAGE_BUFSIZE 10240                               //http send/receive message buffer size
 #define HTTP_TRANSLATE_TIMEOUT 5                                 //http translate timeout
@@ -96,7 +97,10 @@ typedef enum method{
 }RequestMethod;
 
 /* error log file's fp global variable*/
-static FILE * Global_fp;
+static FILE * Global_error_log_fp;
+static FILE * Global_cups_log_fp;
+static FILE * Global_request_log_fp;
+static FILE * Global_exe_log_fp;
 /* time string */
 #define TIME_STRING_LENGTH 32
 static char Global_TimeString[TIME_STRING_LENGTH];
@@ -104,6 +108,7 @@ static char Global_WebServerIP[32];
 static char Global_WebServerPort[16];
 static char Global_GetPrintURL[2048];
 static char Global_ICCardServerPort[16];
+static char Global_LogFilePath[4096];
 /* global variable end */
 
 /*FUNCTION      :get current time and save it to time string                            */
@@ -143,8 +148,8 @@ static int getValueFromJosn(char* json_data,char* key_word,char* value_buf,int v
         int value_len = 0;
         if(json_data == NULL || key_word== NULL){
                 getTime(Global_TimeString);
-                fprintf(Global_fp,"%s Json data or key word is NULL\n",Global_TimeString);
-		fflush(Global_fp); 
+                fprintf(Global_error_log_fp,"%s[ICSubProc] Json data or key word is NULL\n",Global_TimeString);
+		fflush(Global_error_log_fp); 
                 return result;
         }
 
@@ -153,39 +158,39 @@ static int getValueFromJosn(char* json_data,char* key_word,char* value_buf,int v
         keyword_mark = strstr(keyword_mark,key_word);
         if(keyword_mark == NULL){
                 getTime(Global_TimeString);
-                fprintf(Global_fp,"%s [%s] is not found\n",Global_TimeString,key_word);
-		fflush(Global_fp);
+                fprintf(Global_error_log_fp,"%s[ICSubProc] [%s] is not found\n",Global_TimeString,key_word);
+		fflush(Global_error_log_fp);
                 return result;
         }
 
         lift_braces_pos = strchr(keyword_mark,':');
         if(lift_braces_pos == NULL){
                 getTime(Global_TimeString);
-                fprintf(Global_fp,"%s [%s]'s lift ':' is not found\n",Global_TimeString,key_word);
-		fflush(Global_fp);
+                fprintf(Global_error_log_fp,"%s[ICSubProc] [%s]'s lift ':' is not found\n",Global_TimeString,key_word);
+		fflush(Global_error_log_fp);
                 return result;
         }
 
         lift_braces_pos = strchr(lift_braces_pos,'"');
         if(lift_braces_pos == NULL){
                 getTime(Global_TimeString);
-                fprintf(Global_fp,"%s [%s]'s lift '\"' is not found\n",Global_TimeString,key_word);
-		fflush(Global_fp);
+                fprintf(Global_error_log_fp,"%s[ICSubProc] [%s]'s lift '\"' is not found\n",Global_TimeString,key_word);
+		fflush(Global_error_log_fp);
                 return result;
         }
 
         right_braces_pos = strchr(lift_braces_pos+1,'"');
         if(right_braces_pos == NULL){
                 getTime(Global_TimeString);
-                fprintf(Global_fp,"%s [%s]'s right '\"' is not found\n",Global_TimeString,key_word);
-		fflush(Global_fp);
+                fprintf(Global_error_log_fp,"%s[ICSubProc] [%s]'s right '\"' is not found\n",Global_TimeString,key_word);
+		fflush(Global_error_log_fp);
                 return result;
         }
         value_len = right_braces_pos - lift_braces_pos -1;
         if(value_len <= 1 || value_len >= value_buf_length){
                 getTime(Global_TimeString);
-                fprintf(Global_fp,"%s there is no [%s]'s data or data is too long . value length =%d\n",Global_TimeString,key_word,value_len);
-		fflush(Global_fp);
+                fprintf(Global_error_log_fp,"%s[ICSubProc] there is no [%s]'s data or data is too long . value length =%d\n",Global_TimeString,key_word,value_len);
+		fflush(Global_error_log_fp);
                 return result;
         }
         //key word 's value is found
@@ -212,18 +217,18 @@ static void getWebInfoFormConfigFile() {
         fp = fopen(WEBSERVER_CONFIG_FILE_PATH,"r");
         if(fp <= 0){
                 getTime(Global_TimeString);
-                fprintf(Global_fp,"%s read config file failed1 getWebInfoFormConfigFile() 's fp = %p\n",Global_TimeString,fp);
-	        fflush(Global_fp);
-                fclose(Global_fp);
+                fprintf(Global_error_log_fp,"%s[ICSubProc][INITIAL] read config file failed1 getWebInfoFormConfigFile() 's fp = %p\n",Global_TimeString,fp);
+	        fflush(Global_error_log_fp);
+                fclose(Global_error_log_fp);
                 exit(1);
         }
 
         ret=fread(file_buffer,sizeof(char),sizeof(file_buffer),fp);
         if(ret <=0 ){
                 getTime(Global_TimeString);
-                fprintf(Global_fp,"%s read config file failed2 getWebInfoFormConfigFile() 's ret = %d\n",Global_TimeString,ret);
-	        fflush(Global_fp);
-                fclose(Global_fp);
+                fprintf(Global_error_log_fp,"%s[ICSubProc][INITIAL] read config file failed2 getWebInfoFormConfigFile() 's ret = %d\n",Global_TimeString,ret);
+	        fflush(Global_error_log_fp);
+                fclose(Global_error_log_fp);
                 fclose(fp);
                 exit(1);
         } else {
@@ -235,29 +240,29 @@ static void getWebInfoFormConfigFile() {
         //fflush(Global_fp);
 
         if(getValueFromJosn(file_buffer,WEB_SERVER_IP_KEY_WORD,Global_WebServerIP,sizeof(Global_WebServerIP)) != 1){
-                fclose(Global_fp);
+                fclose(Global_error_log_fp);
                 exit(1);  
         }
 
         if(getValueFromJosn(file_buffer,WEB_SERVER_PORT_KEY_WORD,Global_WebServerPort,sizeof(Global_WebServerPort)) != 1){
-                fclose(Global_fp);
+                fclose(Global_error_log_fp);
                 exit(1);  
         }
 
         if(getValueFromJosn(file_buffer,ICCARD_SERVER_PORT_KEY_WORD,Global_ICCardServerPort,sizeof(Global_ICCardServerPort)) != 1){
-                fclose(Global_fp);
+                fclose(Global_error_log_fp);
                 exit(1);  
         }
 
         if(getValueFromJosn(file_buffer,SEARCH_JOB_URL_KEY_WORD,Global_GetPrintURL,sizeof(Global_GetPrintURL)) != 1){
-                fclose(Global_fp);
+                fclose(Global_error_log_fp);
                 exit(1);  
         }
-
-        getTime(Global_TimeString);
-        fprintf(Global_fp,"%s \n Global_WebServerIP=%s \nGlobal_WebServerPort=%s\nGlobal_ICCardServerPort=%s\nGlobal_GetPrintURL=%s\n",
-        Global_TimeString,Global_WebServerIP,Global_WebServerPort,Global_ICCardServerPort,Global_GetPrintURL);
-        fflush(Global_fp);
+        
+        if(getValueFromJosn(file_buffer,LOG_PATH_KEY_WORD,Global_LogFilePath,sizeof(Global_LogFilePath)) != 1){
+                fclose(Global_error_log_fp);
+                exit(1);  
+        }
        
 }
 
@@ -288,8 +293,8 @@ static int initWebSocktAndConnect() {
         //creat a new socket        
         if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0 ) {
                 getTime(Global_TimeString);
-                fprintf(Global_fp,"%s web socket creat failed!\n",Global_TimeString);
-		fflush(Global_fp);
+                fprintf(Global_cups_log_fp,"%s[ICSubProc] web socket creat failed!\n",Global_TimeString);
+		fflush(Global_cups_log_fp);
                 return -1;
         }
         
@@ -300,8 +305,8 @@ static int initWebSocktAndConnect() {
         //exchange IP Address
         if (inet_pton(AF_INET, Global_WebServerIP, &servaddr.sin_addr) <= 0 ){
                 getTime(Global_TimeString);
-                fprintf(Global_fp,"%s inet_pton IP Address error!\n",Global_TimeString);
-		fflush(Global_fp);
+                fprintf(Global_cups_log_fp,"%s[ICSubProc] inet_pton IP Address error!\n",Global_TimeString);
+		fflush(Global_cups_log_fp);
                 httpSocketClose(sockfd);
                 return -1;
         }
@@ -313,16 +318,16 @@ static int initWebSocktAndConnect() {
 
         if(setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0) {
                 getTime(Global_TimeString);
-                fprintf(Global_fp,"%s initWebSocktAndConnect() setsockopt SO_SNDTIMEO error!\n",Global_TimeString);
-                fflush(Global_fp);
+                fprintf(Global_cups_log_fp,"%s[ICSubProc] initWebSocktAndConnect() setsockopt SO_SNDTIMEO error!\n",Global_TimeString);
+                fflush(Global_cups_log_fp);
                 httpSocketClose(sockfd);
                 return -1;
         }
 
         if(setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) <  0) {
                 getTime(Global_TimeString);
-                fprintf(Global_fp,"%s initWebSocktAndConnect() setsockopt SO_RCVTIMEO error!\n",Global_TimeString);
-                fflush(Global_fp);
+                fprintf(Global_cups_log_fp,"%s[ICSubProc] initWebSocktAndConnect() setsockopt SO_RCVTIMEO error!\n",Global_TimeString);
+                fflush(Global_cups_log_fp);
                 httpSocketClose(sockfd);
                 return -1;
         }
@@ -330,8 +335,8 @@ static int initWebSocktAndConnect() {
         //connect to web server
         if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0){
                 getTime(Global_TimeString);
-                fprintf(Global_fp,"%s connect error!\n",Global_TimeString);
-		fflush(Global_fp);
+                fprintf(Global_cups_log_fp,"%s[ICSubProc] connect error!\n",Global_TimeString);
+		fflush(Global_cups_log_fp);
                 httpSocketClose(sockfd);
                 return -1;
         }
@@ -393,12 +398,13 @@ static int httpSend(int sockfd,char* send_message) {
         ret = write(sockfd,send_message,strlen(send_message));
         if (ret < 0) {
                 getTime(Global_TimeString);
-                fprintf(Global_fp,"%s message send error! error num is %d error message is '%s'\n",
+                fprintf(Global_exe_log_fp,"%s[ICSubProc] Http message send error! error num is %d error message is '%s'\n",
                         Global_TimeString, errno, strerror(errno));
-                fflush(Global_fp);
+                fflush(Global_exe_log_fp);
                 
         } else {
                 //message send complete!
+
         }
 
         return ret;
@@ -421,21 +427,24 @@ static int httpReceive(int sockfd, char* receive_buffer){
                 i= read(sockfd, receive_temp_buffer, sizeof(receive_temp_buffer)-1);
                 if (i==0) {
                         //server socket is closed
+                        getTime(Global_TimeString);
+                        fprintf(Global_exe_log_fp,"%s[ICSubProc] Http message receive zero,server socket is closed\n",Global_TimeString);
+                        fflush(Global_exe_log_fp);
                         break;
 
                 } else if(i < 0) {
                         //time out
                         getTime(Global_TimeString);
-                        fprintf(Global_fp,"%s message receive error! error num is %d error message is '%s'\n",
+                        fprintf(Global_exe_log_fp,"%s[ICSubProc] Http message receive error! error num is %d error message is '%s'\n",
                         Global_TimeString, errno, strerror(errno));
-                        fflush(Global_fp);
+                        fflush(Global_exe_log_fp);
                         break;
 
                 } else {
                         if((receive_lenght + i) > HTTP_MESSAGE_BUFSIZE) {
                                 getTime(Global_TimeString);
-                                fprintf(Global_fp,"%s Receive buffer is full! data droped\n",Global_TimeString);
-                                fflush(Global_fp);
+                                fprintf(Global_exe_log_fp,"%s[ICSubProc] Http Receive buffer is full! data droped\n",Global_TimeString);
+                                fflush(Global_exe_log_fp);
                                 receive_lenght = -1;
                                 break;
                         } else {
@@ -469,34 +478,37 @@ static int serchJobIDformHTTPResponseMessage(char* response_message,long *job_li
         printer_name[0] = '\0';
 
         getTime(Global_TimeString);
-        fprintf(Global_fp,"%s response_message is \n%s\n",Global_TimeString,response_message);
-	fflush(Global_fp);
+        fprintf(Global_exe_log_fp,"%s[ICSubProc] serchJobIDformHTTPResponseMessage...\n",Global_TimeString);
+	fflush(Global_exe_log_fp);
 
         //serch printer name begin
         keyword_mark = strstr(keyword_mark,PRINTER_NAME_KEY_WORD);
         if(keyword_mark == NULL){
                 getTime(Global_TimeString);
-                fprintf(Global_fp,"%s printer name Key word is not found\n",Global_TimeString);
-		fflush(Global_fp);
+                fprintf(Global_exe_log_fp,"%s[ICSubProc] printer name Key word is not found\n",Global_TimeString);
+		fflush(Global_exe_log_fp);
                 return -1;
         }
         right_braces_pos = strchr(keyword_mark,',');
         if(right_braces_pos == NULL){
                 getTime(Global_TimeString);
-                fprintf(Global_fp,"%s printer name's right braces is not found\n",Global_TimeString);
-		fflush(Global_fp);
+                fprintf(Global_exe_log_fp,"%s[ICSubProc] printer name's right braces is not found\n",Global_TimeString);
+		fflush(Global_exe_log_fp);
                 return -1;
         }
         lift_braces_pos = strchr(keyword_mark,':');
         if(lift_braces_pos == NULL){
                 getTime(Global_TimeString);
-                fprintf(Global_fp,"%s printer name's lift braces is not found\n",Global_TimeString);
-		fflush(Global_fp);
+                fprintf(Global_exe_log_fp,"%s[ICSubProc] printer name's lift braces is not found\n",Global_TimeString);
+		fflush(Global_exe_log_fp);
                 return -1;
         }
         if((right_braces_pos - lift_braces_pos) == 3){
 
-                //there is no printer name's data 
+                //there is no printer name's data
+                getTime(Global_TimeString);
+                fprintf(Global_exe_log_fp,"%s[ICSubProc] there is no printer name's data\n",Global_TimeString);
+		fflush(Global_exe_log_fp); 
                 return 0;
         }
         //printer name is found
@@ -509,28 +521,31 @@ static int serchJobIDformHTTPResponseMessage(char* response_message,long *job_li
         keyword_mark = strstr(keyword_mark,JOB_ID_KEY_WORD);
         if(keyword_mark == NULL){
                 getTime(Global_TimeString);
-                fprintf(Global_fp,"%s job id Key word is not found\n",Global_TimeString);
-		fflush(Global_fp);
+                fprintf(Global_exe_log_fp,"%s[ICSubProc] job id Key word is not found\n",Global_TimeString);
+		fflush(Global_exe_log_fp);
                 return -1;
         }
         right_braces_pos = strchr(keyword_mark,']');
         if(right_braces_pos == NULL){
                 getTime(Global_TimeString);
-                fprintf(Global_fp,"%s job id's right braces is not found\n",Global_TimeString);
-		fflush(Global_fp);
+                fprintf(Global_exe_log_fp,"%s[ICSubProc] job id's right braces is not found\n",Global_TimeString);
+		fflush(Global_exe_log_fp);
                 return -1;
         }
         lift_braces_pos = strchr(keyword_mark,'[');
         if(lift_braces_pos == NULL){
                 getTime(Global_TimeString);
-                fprintf(Global_fp,"%s job id's lift braces is not found\n",Global_TimeString);
-		fflush(Global_fp);
+                fprintf(Global_exe_log_fp,"%s[ICSubProc] job id's lift braces is not found\n",Global_TimeString);
+		fflush(Global_exe_log_fp);
                 return -1;
         }
 
         if((right_braces_pos - lift_braces_pos) == 1){
 
                 //there is no job id's data ,job number is 0
+                getTime(Global_TimeString);
+                fprintf(Global_exe_log_fp,"%s[ICSubProc] there is no job id's data\n",Global_TimeString);
+		fflush(Global_exe_log_fp);
                 return 0;
         }
 
@@ -569,6 +584,9 @@ static int serchJobIDformHTTPResponseMessage(char* response_message,long *job_li
         
         //printable job num is saved in job_list[0]
         job_list[0] = i;
+        getTime(Global_TimeString);
+        fprintf(Global_exe_log_fp,"%s[ICSubProc] printable job num is =%d\n",Global_TimeString,i);
+	fflush(Global_exe_log_fp);
         return i;
 
 }
@@ -607,7 +625,11 @@ static int getJobIDfromHTTPServer(long iccard_reader_id,long iccard_user_id,long
                 httpSocketClose(sockfd);
                 return -1;
         } else {
-               /*send complete*/ 
+               /*send complete*/
+                getTime(Global_TimeString);
+                fprintf(Global_exe_log_fp,"%s[ICSubProc] Http message send successful! message is %s\n",
+                        Global_TimeString, http_request_message);
+                fflush(Global_exe_log_fp); 
         }
 
         if(httpReceive(sockfd,http_response_message) <= 0){
@@ -616,6 +638,10 @@ static int getJobIDfromHTTPServer(long iccard_reader_id,long iccard_user_id,long
                 return -1;
         } else{
                 /*receive complete*/ 
+                getTime(Global_TimeString);
+                fprintf(Global_exe_log_fp,"%s[ICSubProc] Http message receive successful! message is %s\n",
+                        Global_TimeString, http_response_message);
+                fflush(Global_exe_log_fp);
 				
         }
 
@@ -641,19 +667,26 @@ static void lpPrintByJobid(long* job_id_list,char* printer_name){
 
                 memset(commad_buffer, 0, sizeof(commad_buffer));
                 snprintf(commad_buffer,sizeof(commad_buffer),"%s/../../bin/lp -d %s -o raw -H resume -i %ld",ServerBin,printer_name,job_id_list[i]);
+                getTime(Global_TimeString);
+                fprintf(Global_exe_log_fp,"%s[ICSubProc] lpPrintByJobid command=%s\n",Global_TimeString,commad_buffer);
+                fflush(Global_exe_log_fp);
 
                 system_ret = system(commad_buffer);
                 if(system_ret == -1){
                         getTime(Global_TimeString);
-                        fprintf(Global_fp,"%s command exe failed result is  %d\n",Global_TimeString, system_ret);
-                        fflush(Global_fp);
+                        fprintf(Global_exe_log_fp,"%s[ICSubProc] command exe failed result is  %d\n",Global_TimeString, system_ret);
+                        fflush(Global_exe_log_fp);
                 } else if(system_ret == 127){
                         getTime(Global_TimeString);
-                        fprintf(Global_fp,"%s sh can't exe command, command exe failed result is  %d\n",
+                        fprintf(Global_exe_log_fp,"%s[ICSubProc] sh can't exe command, command exe failed result is  %d\n",
                                                                                 Global_TimeString,system_ret);
-                        fflush(Global_fp);
+                        fflush(Global_exe_log_fp);
                 } else {
                         //command exe ok
+                        getTime(Global_TimeString);
+                        fprintf(Global_exe_log_fp,"%s[ICSubProc] command exe successful\n",Global_TimeString);
+                        fflush(Global_exe_log_fp);
+
                 }
 
         }
@@ -781,13 +814,17 @@ static void* serchJobListAndPrint(void* arg){
         int job_numbers = 0;
         pthread_t thread_id = pthread_self();
 
+        getTime(Global_TimeString);
+        fprintf(Global_exe_log_fp,"%s[ICSubProc][Thread id:%ld] serchJobListAndPrint Thread is start\n",Global_TimeString,thread_id);
+        fflush(Global_exe_log_fp);
+
         memset(sendbuf, 0, sizeof(sendbuf));
         snprintf(sendbuf,sizeof(sendbuf)-1,ICCARD_LCD_MESSAGE_SRECH_JOB,
                                         search_job_info->icCardReaderId,Global_Serch_Job_Message);
         i = sendto(search_job_info->socketFd,sendbuf,strlen(sendbuf)-1,0,(struct sockaddr*)&(search_job_info->clientAddress),search_job_info->clientLen);
         getTime(Global_TimeString);
-        fprintf(Global_fp,"%s [Thread id:%ld]send i=%d msg=%s\n",Global_TimeString,thread_id, i,sendbuf);
-        fflush(Global_fp);
+        fprintf(Global_exe_log_fp,"%s[ICSubProc][Thread id:%ld] serching Job... send to ICCard Reader message=%s \n",Global_TimeString,thread_id,sendbuf);
+        fflush(Global_exe_log_fp);
 
         job_numbers = getJobIDfromHTTPServer(search_job_info->icCardReaderId,search_job_info->icCardUserId,job_id_list,printer_name);
 
@@ -797,6 +834,9 @@ static void* serchJobListAndPrint(void* arg){
                 snprintf(sendbuf,sizeof(sendbuf),ICCARD_LCD_MESSAGE_SRECH_JOB_OK,
                                 search_job_info->icCardReaderId,Global_Serch_Job_Ok_Message);
                 sendto(search_job_info->socketFd,sendbuf,sizeof(sendbuf),0,(struct sockaddr*)&(search_job_info->clientAddress),search_job_info->clientLen);
+                getTime(Global_TimeString);
+                fprintf(Global_exe_log_fp,"%s[ICSubProc][Thread id:%ld] serchJob:OK, send to ICCard Reader message=%s \n",Global_TimeString,thread_id,sendbuf);
+                fflush(Global_exe_log_fp);
 
                 lpPrintByJobid(job_id_list,printer_name);
 
@@ -806,19 +846,25 @@ static void* serchJobListAndPrint(void* arg){
                                 search_job_info->icCardReaderId,Global_Serch_Job_Ng_Message);
                 sendto(search_job_info->socketFd,sendbuf,sizeof(sendbuf),0,
                                 (struct sockaddr*)&(search_job_info->clientAddress),search_job_info->clientLen);
+                getTime(Global_TimeString);
+                fprintf(Global_exe_log_fp,"%s[ICSubProc][Thread id:%ld] serchJob:NG, send to ICCard Reader message=%s \n",Global_TimeString,thread_id,sendbuf);
+                fflush(Global_exe_log_fp);
         } else {
                 //if job_numbers is minute value , it must be a parse error occurd
                 //send the parse tapinfo failed  message to the iccard reader for lcd display
                 snprintf(sendbuf,sizeof(sendbuf),ICCARD_LCD_MESSAGE_PARSE_FAILD,
                                 search_job_info->icCardReaderId,Global_Web_Parse_Faild_Message);
                 sendto(search_job_info->socketFd,sendbuf,sizeof(sendbuf),0,(struct sockaddr*)&(search_job_info->clientAddress),search_job_info->clientLen);
+                getTime(Global_TimeString);
+                fprintf(Global_exe_log_fp,"%s[ICSubProc][Thread id:%ld] serchJob:NA send to ICCard Reader message=%s \n",Global_TimeString,thread_id,sendbuf);
+                fflush(Global_exe_log_fp);
         }
 
         free(search_job_info);
         search_job_info = NULL;
         getTime(Global_TimeString);
-        fprintf(Global_fp,"%s [Thread id:%ld] is OVER\n",Global_TimeString,thread_id);
-        fflush(Global_fp);
+        fprintf(Global_exe_log_fp,"%s[ICSubProc][Thread id:%ld] serchJobListAndPrint Thread is end\n",Global_TimeString,thread_id);
+        fflush(Global_exe_log_fp);
         pthread_exit((void*)0);
         return NULL;
 
@@ -839,8 +885,8 @@ static int initICCardSocketServer(){
         socket_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         if( socket_fd == -1 ){
                 getTime(Global_TimeString);
-                fprintf(Global_fp,"%s create socket error: %s(errno: %d)\n",Global_TimeString, strerror(errno),errno);
-		fflush(Global_fp);
+                fprintf(Global_cups_log_fp,"%s[ICSubProc][INITIAL] create socket error: %s(errno: %d)\n",Global_TimeString, strerror(errno),errno);
+		fflush(Global_cups_log_fp);
                 return -1;
         }
         
@@ -853,8 +899,8 @@ static int initICCardSocketServer(){
         //bind the serverinfo to the socket
         if( bind(socket_fd, (struct sockaddr*)&servaddr, sizeof(servaddr)) == -1){
                 getTime(Global_TimeString);
-                fprintf(Global_fp,"%s bind socket error: %s(errno: %d)\n",Global_TimeString, strerror(errno),errno);
-		fflush(Global_fp);
+                fprintf(Global_cups_log_fp,"%s[ICSubProc][INITIAL] bind socket error: %s(errno: %d)\n",Global_TimeString, strerror(errno),errno);
+		fflush(Global_cups_log_fp);
                 return -1;
         }
 
@@ -903,8 +949,8 @@ static void acceptICCardTap(int socket_fd){
 		//receive message from a client
                 //the process will be suspended when no data is received
                 getTime(Global_TimeString);
-                fprintf(Global_fp,"%s receive iccard tapinfo ......\n",Global_TimeString);
-                fflush(Global_fp); 				
+                fprintf(Global_exe_log_fp,"%s[ICSubProc] receive iccard tapinfo ......\n",Global_TimeString);
+                fflush(Global_exe_log_fp); 				
                 memset(receive_iccard_info_buffer, 0, sizeof(receive_iccard_info_buffer));
                 i= recvfrom(socket_fd, receive_iccard_info_buffer, sizeof(receive_iccard_info_buffer), 
                                                         MSG_WAITALL, (struct sockaddr*)&client_address, &client_len);        
@@ -916,8 +962,8 @@ static void acceptICCardTap(int socket_fd){
                 } else if( i <0 ) {
                         //receive data error occurd
                         getTime(Global_TimeString);
-                        fprintf(Global_fp,"%s receive iccard tapinfo socket error (errno: %d)\n",Global_TimeString, i);
-                        fflush(Global_fp);
+                        fprintf(Global_exe_log_fp,"%s[ICSubProc] receive iccard tapinfo socket error (errno: %d)\n",Global_TimeString, i);
+                        fflush(Global_exe_log_fp);
 
                         //forbidden dead loop
                         break;
@@ -929,15 +975,17 @@ static void acceptICCardTap(int socket_fd){
 
                         //receive data ok
                         getTime(Global_TimeString);
-                        fprintf(Global_fp,"%s receive i=%d msg=%s\n",Global_TimeString, i,receive_iccard_info_buffer);
-                        fflush(Global_fp);
+                        fprintf(Global_exe_log_fp,"%s[ICSubProc] receive i=%d msg=%s\n",Global_TimeString, i,receive_iccard_info_buffer);
+                        fflush(Global_exe_log_fp);
                         //judge the receive message content
                         if(strncmp(receive_iccard_info_buffer,ICCARD_TAP_COMMAND_KEY,sizeof(ICCARD_TAP_COMMAND_KEY)-1) == 0)
 			{       
                                 parse_result = parseICCardTapInfo(receive_iccard_info_buffer,&iccard_reader_id,&iccard_user_id,&package_id);
                                 if(parse_result == 1) {
                                         //parse tapinfo successful
-
+                                        getTime(Global_TimeString);
+                                        fprintf(Global_exe_log_fp,"%s[ICSubProc] parse tapinfo successful\n",Global_TimeString);
+                                        fflush(Global_exe_log_fp);
                                         //filter the repeat tapinfo
                                         icrp = iccard_package_info_head;
                                         while(icrp != NULL){
@@ -960,8 +1008,8 @@ static void acceptICCardTap(int socket_fd){
                                                                 ret = pthread_create(&tid,NULL,serchJobListAndPrint,(void*)search_job_info);
                                                                 if(ret != 0){
                                                                         getTime(Global_TimeString);
-                                                                        fprintf(Global_fp,"%s pthread_create error:%s\n",Global_TimeString, strerror(ret));
-                                                                        fflush(Global_fp);
+                                                                        fprintf(Global_exe_log_fp,"%s[ICSubProc] pthread_create error:%s\n",Global_TimeString, strerror(ret));
+                                                                        fflush(Global_exe_log_fp);
                                                                 }else {
                                                                         pthread_detach(tid);
                                                                 }
@@ -987,8 +1035,8 @@ static void acceptICCardTap(int socket_fd){
                                                                 ret = pthread_create(&tid,NULL,serchJobListAndPrint,(void*)search_job_info);
                                                                 if(ret != 0){
                                                                         getTime(Global_TimeString);
-                                                                        fprintf(Global_fp,"%s pthread_create error:%s\n",Global_TimeString, strerror(ret));
-                                                                        fflush(Global_fp);
+                                                                        fprintf(Global_exe_log_fp,"%s[ICSubProc] pthread_create error:%s\n",Global_TimeString, strerror(ret));
+                                                                        fflush(Global_exe_log_fp);
                                                                 }else {
                                                                         pthread_detach(tid);
                                                                 }
@@ -1001,12 +1049,15 @@ static void acceptICCardTap(int socket_fd){
                                 } else {
                                         //parse tapinfo failed 
                                         getTime(Global_TimeString);
-                                        fprintf(Global_fp,"%s parse tapinfo failed (errno: %d)\n",Global_TimeString, parse_result);
-		                        fflush(Global_fp);
+                                        fprintf(Global_exe_log_fp,"%s[ICSubProc] parse tapinfo failed (errno: %d)\n",Global_TimeString, parse_result);
+		                        fflush(Global_exe_log_fp);
                                 }
                         
                         } else {
                                 //received message is not necessary
+                                getTime(Global_TimeString);
+                                fprintf(Global_exe_log_fp,"%s[ICSubProc] received message is not necessary\n",Global_TimeString);
+		                fflush(Global_exe_log_fp);
                         }
                                       
                 }
@@ -1093,18 +1144,67 @@ int icCardServerSubProcessStart()
 
    
         int iccard_server_socket_fd = 0;
+        char time_string[32];
+        char log_file_name[4352];
+        memset(time_string,0,32);
+        memset(log_file_name,0,4352);
+        time_t now;
+        struct tm *tm_now;
+
+        //get current time
+        time(&now);
+        tm_now = localtime(&now);
 
         //exchange the process to daemon
         //initDaemon();
-        Global_fp = fopen(ERROR_INFO_FILE_PATH,"at+");
-        if(Global_fp <= 0) exit(1);
+        Global_error_log_fp = fopen(ERROR_INFO_FILE_PATH,"at+");
+        if(Global_error_log_fp <= 0) exit(1);
+        
         //get config infomation from config file
         getWebInfoFormConfigFile();
+        
+        //get execute log file
+        snprintf(log_file_name,sizeof(log_file_name),
+        "%s/execute_print_%4d-%02d-%02d.log",Global_LogFilePath,tm_now->tm_year+1900,tm_now->tm_mon+1,tm_now->tm_mday);
+        Global_exe_log_fp = fopen(log_file_name,"at+");
+        if(Global_exe_log_fp <= 0) {
+                fclose(Global_error_log_fp);
+                exit(1);
+        }
+        memset(log_file_name,0,4352);
+        //get request log file
+        snprintf(log_file_name,sizeof(log_file_name),
+        "%s/request_print_%4d-%02d-%02d.log",Global_LogFilePath,tm_now->tm_year+1900,tm_now->tm_mon+1,tm_now->tm_mday);
+        Global_request_log_fp = fopen(log_file_name,"at+");
+        if(Global_request_log_fp <= 0) {
+                fclose(Global_error_log_fp);
+                fclose(Global_exe_log_fp);
+                exit(1);
+        }
+        memset(log_file_name,0,4352);
+        //get cups log file
+        snprintf(log_file_name,sizeof(log_file_name),
+        "%s/cups_%4d-%02d-%02d.log",Global_LogFilePath,tm_now->tm_year+1900,tm_now->tm_mon+1,tm_now->tm_mday);
+        Global_cups_log_fp = fopen(log_file_name,"at+");
+        if(Global_cups_log_fp <= 0) {
+                fclose(Global_error_log_fp);
+                fclose(Global_exe_log_fp);
+                fclose(Global_request_log_fp);
+                exit(1);
+        }
+        memset(log_file_name,0,4352);
+
+        getTime(Global_TimeString);
+        fprintf(Global_cups_log_fp,"%s[ICSubProc][INITIAL] Global_WebServerIP=%s;Global_WebServerPort=%s;Global_ICCardServerPort=%s;\n",
+        Global_TimeString,Global_WebServerIP,Global_WebServerPort,Global_ICCardServerPort);
+        fprintf(Global_cups_log_fp,"%s[ICSubProc][INITIAL] Global_GetPrintURL=%s\n",Global_TimeString,Global_GetPrintURL);
+        fflush(Global_cups_log_fp);
+
         //initalize ICCARDread server
         iccard_server_socket_fd = initICCardSocketServer();
         getTime(Global_TimeString);
-        fprintf(Global_fp,"%s initICCardSocketServer() 's ret = %d\n",Global_TimeString,iccard_server_socket_fd);
-	fflush(Global_fp);
+        fprintf(Global_cups_log_fp,"%s[ICSubProc][INITIAL] initICCardSocketServer() 's ret = %d\n",Global_TimeString,iccard_server_socket_fd);
+	fflush(Global_cups_log_fp);
         if(iccard_server_socket_fd > 0) {
                 //loop accept the iccard tap info and parse them for printing
                 //if there is't any data has be accepted
@@ -1115,6 +1215,9 @@ int icCardServerSubProcessStart()
         //if the process run to here
         //there must be a socket error occurd
         close(iccard_server_socket_fd);
-        fclose(Global_fp);
+        fclose(Global_error_log_fp);
+        fclose(Global_exe_log_fp);
+        fclose(Global_request_log_fp);
+        fclose(Global_cups_log_fp);
         exit(1);
 }
