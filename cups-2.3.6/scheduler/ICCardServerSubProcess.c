@@ -46,7 +46,7 @@ typedef struct searchJobInfo
 #define WEB_SERVER_PORT_KEY_WORD "web_server_port"
 #define SEARCH_JOB_URL_KEY_WORD "URL_getPrint"
 #define LOG_PATH_KEY_WORD "CASIC_CUPS_Log_Path" 
-#define SEARCH_JOB_URL "%s?iccard_reader_id=%05ld&iccard_user_id=%10ld"  //web server 's URL,the length limit is 2048 Byte
+#define SEARCH_JOB_URL "%s?iccard_reader_id=%05ld&iccard_user_id=%010ld"  //web server 's URL,the length limit is 2048 Byte
 #define HTTP_MESSAGE_BUFSIZE 10240                               //http send/receive message buffer size
 #define HTTP_TRANSLATE_TIMEOUT 5                                 //http translate timeout
 
