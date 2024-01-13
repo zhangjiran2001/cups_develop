@@ -30,12 +30,16 @@ extern int mbr_group_name_to_uuid(const char* name, uuid_t uu);
 extern int mbr_check_membership_by_id(uuid_t user, gid_t group, int* ismember);
 #endif /* __APPLE__ */
 
+#define SAVE_PREVIEW_FILE_KEY_WORD "SavePreViewFile"
+#define EPS_TO_PDF_KEY_WORD "EPStoPDF"
+
 /*
  * Local functions...
  */
 
 //add for print judge system ZHANGJIRAN
 static int send_job_to_webserver(cupsd_job_t *job,cupsd_client_t *con);
+static int getValueFromConfigFile(char* json_data,char* key_word,char* value_buf,int value_buf_length);
 static int getPDFPageNum(char* file_name);
 static void savePreviewFile(char* source_file_path, char* preview_file_path, char* source_file_name, char* preview_file_name);
 
@@ -133,6 +137,65 @@ static int	validate_user(cupsd_job_t *job, cupsd_client_t *con, const char *owne
 
 //add for print judge system ZHANGJIRAN
 //add for print judge system ZHANGJIRAN
+/*FUNCTION      :get the value string from josn config file                             */
+/*INPUT         :char* json_data --- json data 's point                                 */
+/*INPUT         :char* key_word --- key_word 's point                                   */
+/*INPUT         :char* value_buf --- value_buf 's point                                 */
+/*INPUT         :int value_buf_length    value_buf_length 's length                     */
+/*OUTPUT        :char* value_buf --- value_buf 's point                                 */
+/*OUTPUT        :int 1:success 0:failed                                                 */
+static int getValueFromConfigFile(char* json_data,char* key_word,char* value_buf,int value_buf_length){
+
+        char* keyword_mark = NULL;
+        char* right_braces_pos = NULL;
+        char* lift_braces_pos = NULL;
+        int result = 0;
+        int value_len = 0;
+        if(json_data == NULL || key_word== NULL){
+                CASIC_REQUEST_PRINT_LOG("getValueFromConfigFile Json data or key word is NULL");
+                return result;
+        }
+
+        //serch keyword begin
+        keyword_mark = json_data;
+        keyword_mark = strstr(keyword_mark,key_word);
+        if(keyword_mark == NULL){
+                CASIC_REQUEST_PRINT_LOG("getValueFromConfigFile [%s] is not found\n",key_word);
+                return result;
+        }
+
+        lift_braces_pos = strchr(keyword_mark,':');
+        if(lift_braces_pos == NULL){
+                
+                CASIC_REQUEST_PRINT_LOG("getValueFromConfigFile [%s]'s lift ':' is not found\n",key_word);
+                return result;
+        }
+
+        lift_braces_pos = strchr(lift_braces_pos,'"');
+        if(lift_braces_pos == NULL){
+                CASIC_REQUEST_PRINT_LOG("getValueFromConfigFile [%s]'s lift '\"' is not found\n",key_word);
+                return result;
+        }
+
+        right_braces_pos = strchr(lift_braces_pos+1,'"');
+        if(right_braces_pos == NULL){
+                CASIC_REQUEST_PRINT_LOG("getValueFromConfigFile [%s]'s right '\"' is not found\n",key_word);
+                return result;
+        }
+        value_len = right_braces_pos - lift_braces_pos -1;
+        if(value_len <= 1 || value_len >= value_buf_length){
+ 
+                CASIC_REQUEST_PRINT_LOG("getValueFromConfigFile there is no [%s]'s data or data is too long . value length =%d\n",key_word,value_len);
+                return result;
+        }
+        //key word 's value is found
+        snprintf(value_buf,(size_t)(value_len+1),"%s",lift_braces_pos+1);
+
+        result = 1;
+        return result;
+
+}
+
 /*
  * 'getPDFPageNum()' - get The PDF page's numbers.
  * input:char* file_name
@@ -220,25 +283,67 @@ void savePreviewFile(char* source_file_path, char* preview_file_path, char* sour
     char first_line[1024];
     // 拼接完整的文件路径
     char source_file[1024];
+    char source_temp_file[1024];
     char preview_file[1024];
-    char temp_file[1024];
+    char preview_temp_file[1024];
+    char config_file_buffer[3072];
+    char save_preview_file_value[256] = "Disable";
+    char eps_to_pdf_value[256] = "Enable";
     FILE* s_fp = NULL;
     FILE* p_fp = NULL;
+    FILE* c_fp = NULL;//config file
+    FILE* file = NULL;
     size_t count = 0;
     char buffer[4096];
+    int ret = 0;
+    int result = 0;
 
     memset(command,0,sizeof(command));
     memset(first_line,0,sizeof(first_line));
     memset(source_file,0,sizeof(source_file));
     memset(preview_file,0,sizeof(preview_file));
     memset(buffer,0,sizeof(buffer));
-    memset(temp_file,0,sizeof(temp_file));
+    memset(source_temp_file,0,sizeof(source_temp_file));
+    memset(preview_temp_file,0,sizeof(preview_temp_file));
+    memset(config_file_buffer,0,sizeof(config_file_buffer));
+
+    c_fp = fopen(CONFIG_FILE_PATH,"r");
+    if(c_fp <= 0){
+                
+        CASIC_REQUEST_PRINT_LOG("savePreviewFile read config file failed getWebInfoFormConfigFile() 's fp = %p",c_fp);
+
+    } else {
+
+        ret=fread(config_file_buffer,sizeof(char),sizeof(config_file_buffer),c_fp);
+        if(ret <=0 ){     
+
+           CASIC_REQUEST_PRINT_LOG("savePreviewFile read config file failed2 getWebInfoFormConfigFile() 's ret = %d",ret);
+
+        } else {
+                
+
+            if(getValueFromConfigFile(config_file_buffer,SAVE_PREVIEW_FILE_KEY_WORD,save_preview_file_value,sizeof(save_preview_file_value)) != 1){
+                CASIC_REQUEST_PRINT_LOG("savePreviewFile read SAVE_PREVIEW_FILE_KEY_WORD from config file failed");  
+             }
+
+            if(getValueFromConfigFile(config_file_buffer,EPS_TO_PDF_KEY_WORD,eps_to_pdf_value,sizeof(eps_to_pdf_value)) != 1){
+                CASIC_REQUEST_PRINT_LOG("savePreviewFile read SAVE_PREVIEW_FILE_KEY_WORD from config file failed"); 
+             }
+
+             fclose(c_fp);
+        }
+    }
 
 
     snprintf(source_file, sizeof(source_file), "%s/%s", source_file_path, source_file_name);
+    snprintf(source_temp_file, sizeof(source_temp_file), "%s/%s.temp", source_file_path, source_file_name);
     snprintf(preview_file, sizeof(preview_file), "%s/%s", preview_file_path, preview_file_name);
-    snprintf(temp_file, sizeof(temp_file), "%s/%s.temp", preview_file_path, preview_file_name);
+    snprintf(preview_temp_file, sizeof(preview_temp_file), "%s/%s.temp", preview_file_path, preview_file_name);
 
+  // 判断是否生成预览文件
+  if(strcmp(save_preview_file_value,"Enable") == 0){
+
+    CASIC_REQUEST_PRINT_LOG("save_preview_file_value is Enable");
     if((s_fp=fopen(source_file,"r")) == NULL) {
       CASIC_REQUEST_PRINT_LOG("source_file open file failed filename=%s", source_file);
       return;
@@ -262,7 +367,7 @@ void savePreviewFile(char* source_file_path, char* preview_file_path, char* sour
     }
     
     // 打开预览文件
-    FILE* file = fopen(preview_file, "r");
+    file = fopen(preview_file, "r");
     if (file == NULL) {
         CASIC_REQUEST_PRINT_LOG("Can't Open preview file %s\n",preview_file);
         return;
@@ -277,10 +382,10 @@ void savePreviewFile(char* source_file_path, char* preview_file_path, char* sour
     // 检查第一行内容
     if (strstr(first_line, "EPSF") != NULL) {
         // 转换为PDF文件
-        snprintf(command, sizeof(command), "gs -sDEVICE=pdfwrite -dSAFER -dCompatibilityLevel=1.4 -dNOPAUSE -dBATCH -sOutputFile=%s %s", temp_file, preview_file);
+        snprintf(command, sizeof(command), "gs -sDEVICE=pdfwrite -dSAFER -dCompatibilityLevel=1.4 -dNOPAUSE -dBATCH -sOutputFile=%s %s", preview_temp_file, preview_file);
         //snprintf(command, sizeof(command), "gs -sDEVICE=pdfwrite  -o %s %s", temp_file, preview_file);
         // 执行命令
-        int result = system(command);
+        result = system(command);
         if (result == -1) {
           CASIC_REQUEST_PRINT_LOG("EXECUTE ghostscript Command %s Failed \n",command);
           return;
@@ -289,16 +394,62 @@ void savePreviewFile(char* source_file_path, char* preview_file_path, char* sour
         if (remove(preview_file) != 0) {
           CASIC_REQUEST_PRINT_LOG("delete %s file failed!\n",preview_file);
         }    
-        if (rename(temp_file, preview_file) != 0) {
-          CASIC_REQUEST_PRINT_LOG("rename %s file failed!\n",temp_file);
+        if (rename(preview_temp_file, preview_file) != 0) {
+          CASIC_REQUEST_PRINT_LOG("rename %s file failed!\n",preview_temp_file);
         }
     } else if (strstr(first_line, "PDF") != NULL) {
         // do nothing
         
     } else {
-        CASIC_REQUEST_PRINT_LOG("There is not exist EPSF OR PDF file\n");
+        CASIC_REQUEST_PRINT_LOG("There is not exist EPSF OR PDF file1\n");
         return;
     }
+
+  }
+
+  // 判断是否需要将EPS格式的spool文件转换为PDF格式
+  if(strcmp(eps_to_pdf_value,"Enable") == 0){
+    CASIC_REQUEST_PRINT_LOG("eps_to_pdf_value is Enable");
+    // 打开预览文件
+    file = fopen(source_file, "r");
+    if (file == NULL) {
+        CASIC_REQUEST_PRINT_LOG("Can't Open preview file %s\n",source_file);
+        return;
+    }
+    
+    // 读取第一行内容
+    fgets(first_line, sizeof(first_line), file);
+    
+    // 关闭预览文件
+    fclose(file);
+
+    // 检查第一行内容
+    if (strstr(first_line, "EPSF") != NULL) {
+        // 转换为PDF文件
+        snprintf(command, sizeof(command), "gs -sDEVICE=pdfwrite -dSAFER -dCompatibilityLevel=1.4 -dNOPAUSE -dBATCH -sOutputFile=%s %s", source_temp_file, source_file);
+        //snprintf(command, sizeof(command), "gs -sDEVICE=pdfwrite  -o %s %s", temp_file, preview_file);
+        // 执行命令
+        result = system(command);
+        if (result == -1) {
+          CASIC_REQUEST_PRINT_LOG("EXECUTE ghostscript Command %s Failed \n",command);
+          return;
+        }
+
+        if (remove(source_file) != 0) {
+          CASIC_REQUEST_PRINT_LOG("delete %s file failed!\n",source_file);
+        }    
+        if (rename(source_temp_file, source_file) != 0) {
+          CASIC_REQUEST_PRINT_LOG("rename %s file failed!\n",source_temp_file);
+        }
+    } else if (strstr(first_line, "PDF") != NULL) {
+        // do nothing
+        
+    } else {
+        CASIC_REQUEST_PRINT_LOG("There is not exist EPSF OR PDF file2\n");
+        return;
+    }
+
+  }
 
 }
 /*
